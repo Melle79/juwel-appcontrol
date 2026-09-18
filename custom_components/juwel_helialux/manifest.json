@@ -1,11 +1,17 @@
 {
   "domain": "juwel_helialux",
   "name": "Juwel HeliaLux (MyJUWEL Cloud)",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "config_flow": true,
   "documentation": "https://github.com/Melle79/juwel-helialux",
   "issue_tracker": "https://github.com/Melle79/juwel-helialux/issues",
-  "codeowners": ["@Melle79"],
+  "dependencies": [
+    "http",
+    "frontend"
+  ],
+  "codeowners": [
+    "@Melle79"
+  ],
   "iot_class": "cloud_polling",
   "integration_type": "hub",
   "requirements": []

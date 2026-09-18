@@ -32,6 +32,7 @@ Cloud-API wie die MyJUWEL-App, mit deinem MyJUWEL-Konto.
 - **Zwei Designs:** MyJUWEL-Look oder globales Home-Assistant-Theme
 - **Popup:** kompakte Karte öffnet auf Klick die große – wahlweise als eigener Dialog oder über ein Bubble-Card-Popup
 - Vollständig über die **UI konfigurierbar** (grafischer Karten-Editor)
+- **Wird von der Integration mitgeliefert** und automatisch geladen – kein Ressourcen-Eintrag nötig
 
 ---
 
@@ -73,10 +74,14 @@ Pro Gerät werden angelegt:
 dann E-Mail und Passwort deines MyJUWEL-Kontos eintragen (dieselben wie in der App).
 
 ### Dashboard-Karte
-1. `www/juwel-helialux-card.js` nach `<config>/www/` kopieren
-2. **Einstellungen → Dashboards → ⋮ → Ressourcen** → hinzufügen:
-   `/local/juwel-helialux-card.js` als **JavaScript-Modul**
-3. Im Dashboard **Karte hinzufügen → „Juwel HeliaLux"**
+**Nichts weiter zu tun** – die Integration bringt die Karte mit und lädt sie selbst
+ins Frontend. Kein Kopieren nach `www/`, kein Ressourcen-Eintrag.
+
+Einfach im Dashboard **Karte hinzufügen → „Juwel HeliaLux"** wählen.
+
+> Wer die Karte aus einer früheren Version noch manuell unter
+> `/local/juwel-helialux-card.js` eingetragen hat: Diesen Ressourcen-Eintrag und die
+> Datei in `www/` entfernen, sonst wird die Karte doppelt geladen.
 
 ---
 

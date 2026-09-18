@@ -1,5 +1,5 @@
 /*
- * Juwel HeliaLux Card  v1.2.0
+ * Juwel HeliaLux Card  v1.3.0
  * Lovelace-Karte für die Integration "juwel_helialux".
  *
  * Optionen (alle im UI-Editor):
@@ -504,10 +504,16 @@ class JuwelHelialuxCardEditor extends HTMLElement {
   }
 }
 
-customElements.define("juwel-helialux-card", JuwelHelialuxCard);
-customElements.define("juwel-helialux-card-editor", JuwelHelialuxCardEditor);
+// Doppelt-Laden abfangen (z. B. alter Ressourcen-Eintrag + Auto-Registrierung)
+if (!customElements.get("juwel-helialux-card")) {
+  customElements.define("juwel-helialux-card", JuwelHelialuxCard);
+}
+if (!customElements.get("juwel-helialux-card-editor")) {
+  customElements.define("juwel-helialux-card-editor", JuwelHelialuxCardEditor);
+}
 
 window.customCards = window.customCards || [];
+if (!window.customCards.some((c) => c.type === "juwel-helialux-card"))
 window.customCards.push({
   type: "juwel-helialux-card",
   name: "Juwel HeliaLux",
@@ -516,4 +522,4 @@ window.customCards.push({
   documentationURL: "https://github.com/Melle79/juwel-helialux",
 });
 
-console.info("%c JUWEL-HELIALUX-CARD %c v1.2.0 ", "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");
+console.info("%c JUWEL-HELIALUX-CARD %c v1.3.0 ", "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");

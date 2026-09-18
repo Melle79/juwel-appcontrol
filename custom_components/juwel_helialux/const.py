@@ -18,3 +18,8 @@ DEFAULT_SCAN_INTERVAL = 60  # Sekunden
 
 # Produkt-IDs, die diese Integration als Licht behandelt
 LIGHT_PRODUCT_IDS = ("@juwel.lighting.helialux1",)
+
+# Dashboard-Karte, die die Integration selbst mitbringt
+CARD_FILENAME = "juwel-helialux-card.js"
+CARD_URL_BASE = f"/{DOMAIN}"
+CARD_VERSION = "1.3.0"
