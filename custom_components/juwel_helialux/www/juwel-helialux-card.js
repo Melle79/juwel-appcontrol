@@ -1,5 +1,5 @@
 /*
- * Juwel HeliaLux Card  v1.3.0
+ * Juwel HeliaLux Card  v1.3.1
  * Lovelace-Karte für die Integration "juwel_helialux".
  *
  * Optionen (alle im UI-Editor):
@@ -522,4 +522,4 @@ window.customCards.push({
   documentationURL: "https://github.com/Melle79/juwel-helialux",
 });
 
-console.info("%c JUWEL-HELIALUX-CARD %c v1.3.0 ", "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");
+console.info("%c JUWEL-HELIALUX-CARD %c v1.3.1 ", "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");

@@ -74,14 +74,17 @@ Pro Gerät werden angelegt:
 dann E-Mail und Passwort deines MyJUWEL-Kontos eintragen (dieselben wie in der App).
 
 ### Dashboard-Karte
-**Nichts weiter zu tun** – die Integration bringt die Karte mit und lädt sie selbst
-ins Frontend. Kein Kopieren nach `www/`, kein Ressourcen-Eintrag.
+**Nichts weiter zu tun** – die Integration bringt die Karte mit, liefert sie selbst aus
+und legt den passenden Ressourcen-Eintrag automatisch an (und hebt ihn bei Updates auf
+die neue Version, damit kein Browser-Cache im Weg steht).
 
 Einfach im Dashboard **Karte hinzufügen → „Juwel HeliaLux"** wählen.
 
-> Wer die Karte aus einer früheren Version noch manuell unter
-> `/local/juwel-helialux-card.js` eingetragen hat: Diesen Ressourcen-Eintrag und die
-> Datei in `www/` entfernen, sonst wird die Karte doppelt geladen.
+> **Lovelace im YAML-Modus?** Dann trage die Ressource selbst ein:
+> `/juwel_helialux/juwel-helialux-card.js` als **module**.
+>
+> **Update von ≤ 1.2.0?** Den alten Eintrag `/local/juwel-helialux-card.js` und die
+> Datei in `www/` löschen – beides wird nicht mehr gebraucht.
 
 ---
 

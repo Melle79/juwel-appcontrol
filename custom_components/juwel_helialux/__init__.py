@@ -45,15 +45,50 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         return
 
     url = f"{CARD_URL_BASE}/{CARD_FILENAME}"
+    versioned = f"{url}?v={CARD_VERSION}"
     try:
         await hass.http.async_register_static_paths(
             [StaticPathConfig(url, card_path, cache_headers=False)]
         )
-        add_extra_js_url(hass, f"{url}?v={CARD_VERSION}")
+        add_extra_js_url(hass, versioned)
         hass.data[_CARD_KEY] = True
         _LOGGER.debug("Dashboard-Karte registriert unter %s", url)
     except Exception:  # noqa: BLE001
         _LOGGER.exception("Dashboard-Karte konnte nicht registriert werden")
+        return
+
+    # Zusätzlich als Lovelace-Ressource eintragen/aktualisieren.
+    # Die holt das Frontend live über die Websocket-Verbindung und umgeht damit
+    # den Service-Worker-Cache der Startseite (sonst kennt der Browser die Karte
+    # nach einem Update unter Umständen noch nicht).
+    await _async_sync_lovelace_resource(hass, url, versioned)
+
+
+async def _async_sync_lovelace_resource(
+    hass: HomeAssistant, base_url: str, versioned_url: str
+) -> None:
+    """Ressourcen-Eintrag anlegen bzw. auf die aktuelle Version heben."""
+    try:
+        lovelace = hass.data.get("lovelace")
+        resources = getattr(lovelace, "resources", None)
+        if resources is None:
+            return  # Lovelace im YAML-Modus: Nutzer trägt die Ressource selbst ein
+
+        if not getattr(resources, "loaded", False):
+            await resources.async_load()
+            resources.loaded = True
+
+        for item in resources.async_items():
+            if item.get("url", "").split("?")[0] == base_url:
+                if item["url"] != versioned_url:
+                    await resources.async_update_item(item["id"], {"url": versioned_url})
+                    _LOGGER.debug("Karten-Ressource aktualisiert: %s", versioned_url)
+                return
+
+        await resources.async_create_item({"res_type": "module", "url": versioned_url})
+        _LOGGER.debug("Karten-Ressource angelegt: %s", versioned_url)
+    except Exception:  # noqa: BLE001
+        _LOGGER.debug("Karten-Ressource nicht setzbar", exc_info=True)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
