@@ -2,21 +2,35 @@
   "config": {
     "step": {
       "user": {
-        "title": "MyJUWEL Anmeldung",
-        "description": "Melde dich mit deinem MyJUWEL-Konto an (dieselben Zugangsdaten wie in der App).",
+        "title": "MyJUWEL sign-in",
+        "description": "Sign in with your MyJUWEL account — the same credentials you use in the app.",
         "data": {
-          "email": "E-Mail",
-          "password": "Passwort"
+          "email": "Email",
+          "password": "Password"
         }
       }
     },
     "error": {
-      "invalid_auth": "E-Mail oder Passwort falsch.",
-      "cannot_connect": "Keine Verbindung zur MyJUWEL-Cloud.",
-      "unknown": "Unerwarteter Fehler."
+      "invalid_auth": "Wrong email or password.",
+      "cannot_connect": "Cannot reach the MyJUWEL cloud.",
+      "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "Dieses Konto ist bereits eingerichtet."
+      "already_configured": "This account is already set up."
+    }
+  },
+  "entity": {
+    "number": {
+      "white": { "name": "White" },
+      "red": { "name": "Red" },
+      "green": { "name": "Green" },
+      "blue": { "name": "Blue" }
+    },
+    "switch": {
+      "auto_mode": { "name": "Automatic mode" }
+    },
+    "sensor": {
+      "preset": { "name": "Profile" }
     }
   }
 }

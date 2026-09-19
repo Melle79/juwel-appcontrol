@@ -6,6 +6,7 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -23,7 +24,7 @@ async def async_setup_entry(
 class JuwelPresetSensor(JuwelEntity, SensorEntity):
     """Aktives Beleuchtungsprofil; liefert die Tageskurve als Attribut."""
 
-    _attr_name = "Profil"
+    _attr_translation_key = "preset"
     _attr_icon = "mdi:chart-bell-curve-cumulative"
 
     def __init__(self, coordinator: JuwelCoordinator, cloud_device_id: str) -> None:
@@ -66,4 +67,25 @@ class JuwelPresetSensor(JuwelEntity, SensorEntity):
             "mode": self._state.get("mode"),
             "status": self._state.get("status"),
             "connected": self._state.get("connected"),
+            # Geschwister-Entitäten, damit die Karte sie sprachunabhängig findet
+            **self._related_entities(),
+        }
+
+    def _related_entities(self) -> dict[str, Any]:
+        """Entity-IDs der übrigen Entitäten dieses Geräts (über die unique_ids)."""
+        try:
+            reg = er.async_get(self.hass)
+        except Exception:  # noqa: BLE001
+            return {}
+
+        def find(domain: str, suffix: str) -> str | None:
+            return reg.async_get_entity_id(domain, DOMAIN, f"{self._cid}_{suffix}")
+
+        channels = {
+            ch: find("number", ch) for ch in ("white", "red", "green", "blue")
+        }
+        return {
+            "light_entity": find("light", "light"),
+            "auto_switch_entity": find("switch", "auto"),
+            "channel_entities": {k: v for k, v in channels.items() if v},
         }

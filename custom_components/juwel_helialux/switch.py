@@ -27,7 +27,7 @@ async def async_setup_entry(
 class JuwelAutoSwitch(JuwelEntity, SwitchEntity):
     """Automatik-Zeitplan an/aus."""
 
-    _attr_name = "Automatikmodus"
+    _attr_translation_key = "auto_mode"
     _attr_icon = "mdi:calendar-clock"
 
     def __init__(self, coordinator: JuwelCoordinator, cloud_device_id: str) -> None:

@@ -17,16 +17,15 @@ from .entity import JuwelEntity
 
 @dataclass(frozen=True)
 class ChannelDesc:
-    key: str          # interner Schlüssel
-    name: str         # Anzeigename
+    key: str          # Kanal im Geraetezustand
     icon: str
 
 
 CHANNELS: tuple[ChannelDesc, ...] = (
-    ChannelDesc("white", "Weiß", "mdi:brightness-7"),
-    ChannelDesc("red", "Rot", "mdi:palette"),
-    ChannelDesc("green", "Grün", "mdi:palette"),
-    ChannelDesc("blue", "Blau", "mdi:palette"),
+    ChannelDesc("white", "mdi:brightness-7"),
+    ChannelDesc("red", "mdi:palette"),
+    ChannelDesc("green", "mdi:palette"),
+    ChannelDesc("blue", "mdi:palette"),
 )
 
 
@@ -63,7 +62,7 @@ class JuwelChannelNumber(JuwelEntity, NumberEntity):
     ) -> None:
         super().__init__(coordinator, cloud_device_id)
         self._ch = channel
-        self._attr_name = channel.name
+        self._attr_translation_key = channel.key
         self._attr_icon = channel.icon
         self._attr_unique_id = f"{cloud_device_id}_{channel.key}"
 

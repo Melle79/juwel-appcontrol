@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "MyJUWEL login",
-        "description": "Sign in with your MyJUWEL account (same credentials as in the app).",
+        "title": "MyJUWEL sign-in",
+        "description": "Sign in with your MyJUWEL account — the same credentials you use in the app.",
         "data": {
           "email": "Email",
           "password": "Password"
@@ -16,7 +16,21 @@
       "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "This account is already configured."
+      "already_configured": "This account is already set up."
+    }
+  },
+  "entity": {
+    "number": {
+      "white": { "name": "White" },
+      "red": { "name": "Red" },
+      "green": { "name": "Green" },
+      "blue": { "name": "Blue" }
+    },
+    "switch": {
+      "auto_mode": { "name": "Automatic mode" }
+    },
+    "sensor": {
+      "preset": { "name": "Profile" }
     }
   }
 }

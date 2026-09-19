@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#15476f"/>
+      <stop offset="1" stop-color="#06162a"/>
+    </linearGradient>
+    <linearGradient id="fadeW" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".98"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".06"/>
+    </linearGradient>
+    <linearGradient id="fadeR" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff5a4d" stop-opacity=".98"/>
+      <stop offset="1" stop-color="#ff5a4d" stop-opacity=".06"/>
+    </linearGradient>
+    <linearGradient id="fadeG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3ed37a" stop-opacity=".98"/>
+      <stop offset="1" stop-color="#3ed37a" stop-opacity=".06"/>
+    </linearGradient>
+    <linearGradient id="fadeB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4b90ff" stop-opacity=".98"/>
+      <stop offset="1" stop-color="#4b90ff" stop-opacity=".06"/>
+    </linearGradient>
+    <clipPath id="round">
+      <rect x="0" y="0" width="512" height="512" rx="112" ry="112"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#round)">
+    <rect width="512" height="512" fill="url(#bg)"/>
+
+    <!-- vier kräftige Lichtkegel W / R / G / B -->
+    <polygon points="76,176  160,176  176,372  50,372"  fill="url(#fadeW)"/>
+    <polygon points="172,176 256,176  282,372 186,372"  fill="url(#fadeR)"/>
+    <polygon points="256,176 340,176  356,372 260,372"  fill="url(#fadeG)"/>
+    <polygon points="352,176 436,176  462,372 366,372"  fill="url(#fadeB)"/>
+
+    <!-- LED-Leiste, kräftig -->
+    <rect x="44" y="104" width="424" height="72" rx="36" fill="#eef5fc"/>
+    <rect x="44" y="104" width="424" height="34" rx="17" fill="#ffffff"/>
+
+    <!-- Wasseroberfläche -->
+    <path d="M-10 374 q70 -34 140 0 t140 0 t140 0 t140 0 V522 H-10 Z" fill="#083055"/>
+    <path d="M-10 374 q70 -34 140 0 t140 0 t140 0 t140 0"
+          fill="none" stroke="#8fdcff" stroke-width="20" stroke-linecap="round"/>
+
+    <!-- Fisch, groß und einfach -->
+    <g fill="#8fdcff">
+      <path d="M212 452 c44 -40 116 -40 160 0 c-44 40 -116 40 -160 0 Z"/>
+      <path d="M212 452 l-52 -34 v68 Z"/>
+    </g>
+    <circle cx="336" cy="440" r="9" fill="#083055"/>
+  </g>
+</svg>

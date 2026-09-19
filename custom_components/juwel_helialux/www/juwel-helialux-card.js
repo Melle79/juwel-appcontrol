@@ -1,18 +1,56 @@
 /*
- * Juwel HeliaLux Card  v1.3.1
- * Lovelace-Karte für die Integration "juwel_helialux".
+ * Juwel HeliaLux Card  v1.4.0
+ * Lovelace card for the "juwel_helialux" integration.
  *
- * Optionen (alle im UI-Editor):
- *   design : "juwel" (MyJUWEL-Look) | "ha" (globales Home-Assistant-Theme)
- *   layout : "full"  (Kurve, Profil, Schalter, Regler) | "compact" (eine Zeile)
+ * Options (all available in the visual editor):
+ *   design : "juwel" (MyJUWEL look) | "ha" (follow the Home Assistant theme)
+ *   layout : "full"  (curve, profile, switch, sliders) | "compact" (single row)
+ *   tap_action : "popup" | "more-info" | "hash" | "none"
+ *
+ * UI strings are English by default and translated to German automatically.
  */
 
 const CH = [
-  { key: "white", label: "W", name: "Weiß", color: "#ffffff" },
-  { key: "red", label: "R", name: "Rot", color: "#e2574c" },
-  { key: "green", label: "G", name: "Grün", color: "#3fbf6f" },
-  { key: "blue", label: "B", name: "Blau", color: "#3d7fe3" },
+  { key: "white", label: "W", names: ["White", "Weiß"], color: "#ffffff" },
+  { key: "red", label: "R", names: ["Red", "Rot"], color: "#e2574c" },
+  { key: "green", label: "G", names: ["Green", "Grün"], color: "#3fbf6f" },
+  { key: "blue", label: "B", names: ["Blue", "Blau"], color: "#3d7fe3" },
 ];
+
+/* UI strings: English base, German translation */
+const I18N = {
+  en: {
+    status: "Status", online: "Online", offline: "Offline",
+    profile: "Profile", manual: "Manual mode",
+    autoHint: "Sliders are locked while the schedule is running — use the switch above.",
+    notFound: "Entity not found",
+    fLight: "Light entity (Juwel HeliaLux)", fName: "Heading (optional)",
+    fLayout: "Appearance", fDesign: "Design", fChart: "Show daily curve",
+    fTap: "On tap", fHash: "Hash of the Bubble Card pop-up (e.g. #aquarium)",
+    oFull: "Full (curve, profile, sliders)", oCompact: "Compact (single row)",
+    oJuwel: "MyJUWEL look (dark blue)", oHa: "Follow Home Assistant theme",
+    oPopup: "Open the full card as a pop-up", oMore: "Show more-info dialog",
+    oHash: "Open a Bubble Card pop-up by hash", oNone: "Do nothing",
+  },
+  de: {
+    status: "Status", online: "Online", offline: "Offline",
+    profile: "Profil", manual: "Manueller Modus",
+    autoHint: "Im Automatikmodus sind die Regler gesperrt – Schalter oben umlegen.",
+    notFound: "Entität nicht gefunden",
+    fLight: "Licht-Entität (Juwel HeliaLux)", fName: "Überschrift (optional)",
+    fLayout: "Darstellung", fDesign: "Design", fChart: "Tageskurve anzeigen",
+    fTap: "Beim Antippen", fHash: "Hash des Bubble-Card-Popups (z. B. #aquarium)",
+    oFull: "Vollständig (Kurve, Profil, Regler)", oCompact: "Kompakt (eine Zeile)",
+    oJuwel: "MyJUWEL-Look (dunkelblau)", oHa: "Home-Assistant-Theme übernehmen",
+    oPopup: "Große Karte als Popup öffnen", oMore: "Detailansicht (more-info)",
+    oHash: "Bubble-Card-Popup per Hash öffnen", oNone: "Nichts tun",
+  },
+};
+
+const t = (hass) => {
+  const lang = (hass && (hass.language || (hass.locale || {}).language)) || "en";
+  return I18N[lang.split("-")[0]] || I18N.en;
+};
 
 class JuwelHelialuxCard extends HTMLElement {
   constructor() {
@@ -32,7 +70,7 @@ class JuwelHelialuxCard extends HTMLElement {
 
   setConfig(config) {
     if (!config.light && !config.entity) {
-      throw new Error("Bitte eine Licht-Entität der Juwel-Integration angeben.");
+      throw new Error("Please choose a light entity of the Juwel HeliaLux integration.");
     }
     this._config = {
       design: "juwel",
@@ -76,13 +114,28 @@ class JuwelHelialuxCard extends HTMLElement {
     const fname = (e) =>
       (hass.states[e] && hass.states[e].attributes.friendly_name) || "";
 
-    this._ids.auto = c.auto_switch || siblings.find((e) => e.startsWith("switch."));
     this._ids.preset = c.preset_sensor || siblings.find((e) => e.startsWith("sensor."));
+
+    // Bevorzugt: der Profil-Sensor nennt die Geschwister-Entitäten selbst
+    const sa = (this._ids.preset && hass.states[this._ids.preset]
+      ? hass.states[this._ids.preset].attributes
+      : {}) || {};
+    const chMap = sa.channel_entities || {};
+
+    this._ids.auto =
+      c.auto_switch || sa.auto_switch_entity ||
+      siblings.find((e) => e.startsWith("switch."));
 
     CH.forEach((ch) => {
       this._ids[ch.key] =
         c[ch.key] ||
-        siblings.find((e) => e.startsWith("number.") && fname(e).endsWith(ch.name));
+        chMap[ch.key] ||
+        // Rückfall: über den Anzeigenamen (EN/DE)
+        siblings.find(
+          (e) =>
+            e.startsWith("number.") &&
+            ch.names.some((n) => fname(e).endsWith(n))
+        );
     });
   }
 
@@ -175,10 +228,11 @@ class JuwelHelialuxCard extends HTMLElement {
     if (!this._built) this._build();
     this.setAttribute("data-design", this._config.design === "ha" ? "ha" : "juwel");
 
+    const T = t(this._hass);
     const body = this.shadowRoot.getElementById("body");
     const light = this._st(this._ids.light);
     if (!light) {
-      body.innerHTML = `<div class="err">Entität <code>${this._lightId}</code> nicht gefunden.</div>`;
+      body.innerHTML = `<div class="err">${T.notFound}: <code>${this._lightId}</code></div>`;
       return;
     }
 
@@ -219,24 +273,24 @@ class JuwelHelialuxCard extends HTMLElement {
         </svg>
         <div>
           <div class="title">${name}</div>
-          <div class="status">Status:
-            <span class="${online ? "ok" : "bad"}">${online ? "Online" : "Offline"}</span>
+          <div class="status">${T.status}:
+            <span class="${online ? "ok" : "bad"}">${online ? T.online : T.offline}</span>
           </div>
         </div>
       </div>
       ${chart}
       <div class="prow">
         <div class="dot" style="background:${attrs.preset_color || "#b5d4e3"}"></div>
-        <div class="plabel">Profil: ${preset ? preset.state : "–"}</div>
+        <div class="plabel">${T.profile}: ${preset ? preset.state : "–"}</div>
       </div>
       <div class="toggle-row">
         <div class="sw ${isAuto ? "" : "on"}" id="manual"><div class="knob"></div></div>
-        <div class="toggle-label">Manueller Modus</div>
+        <div class="toggle-label">${T.manual}</div>
       </div>
       <div class="sliders ${isAuto ? "disabled" : ""}">
         ${CH.map((ch) => this._sliderHtml(ch)).join("")}
       </div>
-      ${isAuto ? `<div class="hint">Im Automatikmodus sind die Regler gesperrt – Schalter oben umlegen.</div>` : ""}`;
+      ${isAuto ? `<div class="hint">${T.autoHint}</div>` : ""}`;
 
     this._wire();
   }
@@ -439,6 +493,7 @@ class JuwelHelialuxCardEditor extends HTMLElement {
       this.appendChild(this._form);
     }
     const compact = this._config.layout === "compact";
+    const T = t(this._hass);
     this._form.hass = this._hass;
     this._form.data = this._config;
     this._form.schema = [
@@ -454,8 +509,8 @@ class JuwelHelialuxCardEditor extends HTMLElement {
           select: {
             mode: "dropdown",
             options: [
-              { value: "full", label: "Vollständig (Kurve, Profil, Regler)" },
-              { value: "compact", label: "Kompakt (eine Zeile)" },
+              { value: "full", label: T.oFull },
+              { value: "compact", label: T.oCompact },
             ],
           },
         },
@@ -466,8 +521,8 @@ class JuwelHelialuxCardEditor extends HTMLElement {
           select: {
             mode: "dropdown",
             options: [
-              { value: "juwel", label: "MyJUWEL-Look (dunkelblau)" },
-              { value: "ha", label: "Home-Assistant-Theme übernehmen" },
+              { value: "juwel", label: T.oJuwel },
+              { value: "ha", label: T.oHa },
             ],
           },
         },
@@ -479,10 +534,10 @@ class JuwelHelialuxCardEditor extends HTMLElement {
           select: {
             mode: "dropdown",
             options: [
-              { value: "popup", label: "Große Karte als Popup öffnen" },
-              { value: "more-info", label: "Detailansicht (more-info)" },
-              { value: "hash", label: "Bubble-Card-Popup per Hash öffnen" },
-              { value: "none", label: "Nichts tun" },
+              { value: "popup", label: T.oPopup },
+              { value: "more-info", label: T.oMore },
+              { value: "hash", label: T.oHash },
+              { value: "none", label: T.oNone },
             ],
           },
         },
@@ -493,13 +548,13 @@ class JuwelHelialuxCardEditor extends HTMLElement {
     ];
     this._form.computeLabel = (s) =>
       ({
-        light: "Licht-Entität (Juwel HeliaLux)",
-        name: "Überschrift (optional)",
-        layout: "Darstellung",
-        design: "Design",
-        show_chart: "Tageskurve anzeigen",
-        tap_action: "Beim Antippen",
-        popup_hash: "Hash des Bubble-Card-Popups (z. B. #aquarium)",
+        light: T.fLight,
+        name: T.fName,
+        layout: T.fLayout,
+        design: T.fDesign,
+        show_chart: T.fChart,
+        tap_action: T.fTap,
+        popup_hash: T.fHash,
       }[s.name] || s.name);
   }
 }
@@ -517,9 +572,9 @@ if (!window.customCards.some((c) => c.type === "juwel-helialux-card"))
 window.customCards.push({
   type: "juwel-helialux-card",
   name: "Juwel HeliaLux",
-  description: "Aquarienlicht: Tageskurve, Profil und W/R/G/B – vollständig oder kompakt",
+  description: "Aquarium light: daily curve, profile and W/R/G/B — full or compact",
   preview: true,
   documentationURL: "https://github.com/Melle79/juwel-helialux",
 });
 
-console.info("%c JUWEL-HELIALUX-CARD %c v1.3.1 ", "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");
+console.info("%c JUWEL-HELIALUX-CARD %c v1.4.0 ", "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");

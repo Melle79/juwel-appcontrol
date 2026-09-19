@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "MyJUWEL Anmeldung",
-        "description": "Melde dich mit deinem MyJUWEL-Konto an (dieselben Zugangsdaten wie in der App).",
+        "description": "Melde dich mit deinem MyJUWEL-Konto an – dieselben Zugangsdaten wie in der App.",
         "data": {
           "email": "E-Mail",
           "password": "Passwort"
@@ -17,6 +17,20 @@
     },
     "abort": {
       "already_configured": "Dieses Konto ist bereits eingerichtet."
+    }
+  },
+  "entity": {
+    "number": {
+      "white": { "name": "Weiß" },
+      "red": { "name": "Rot" },
+      "green": { "name": "Grün" },
+      "blue": { "name": "Blau" }
+    },
+    "switch": {
+      "auto_mode": { "name": "Automatikmodus" }
+    },
+    "sensor": {
+      "preset": { "name": "Profil" }
     }
   }
 }
