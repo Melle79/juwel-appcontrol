@@ -45,6 +45,8 @@ class JuwelCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             _LOGGER.debug("Profile nicht abrufbar: %s", err)
             presets = []
 
+        feeder_presets: list[dict[str, Any]] | None = None
+
         result: dict[str, dict[str, Any]] = {}
         for dev in settings.get("devices", []):
             cid = dev.get("cloudDeviceId")
@@ -63,7 +65,11 @@ class JuwelCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 )
             product = self._product_configs[product_id]
 
+            if (product or {}).get("deviceTypeId") == "feeder" and feeder_presets is None:
+                feeder_presets = await self.client.get_feeder_presets()
+
             result[cid] = {
+                "feeder_presets": feeder_presets or [],
                 "info": dev,
                 "state": state,
                 "product": product,

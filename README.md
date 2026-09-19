@@ -22,14 +22,14 @@ MyJUWEL app uses, with your MyJUWEL account.
 | Device | Status |
 |---|---|
 | **HeliaLux AppControl** (lighting) | ✅ verified on real hardware |
-| **SmartFeed AppControl** (feeder) | 🧪 built from the manufacturer's device specification — untested |
+| **SmartFeed AppControl** (feeder) | ✅ verified on real hardware |
 | **EccoFlow AppControl** (pump) | 🧪 built from the manufacturer's device specification — untested |
 
 The integration is **trait driven**: for every device it reads the capability
 description from the manufacturer's product catalogue and creates the matching
 entities. New device types therefore show up on their own.
 
-> If you own a SmartFeed or EccoFlow, feedback is very welcome — please
+> If you own an EccoFlow, feedback is very welcome — please
 > [open an issue](https://github.com/Melle79/juwel-appcontrol/issues) with what works
 > and what does not. Controls are only created where the specification defines a
 > clear value range; everything else is exposed read-only so no invalid command is
@@ -48,13 +48,15 @@ entities. New device types therefore show up on their own.
 ### 🐟 Feeder (SmartFeed)
 - **Feed now** button, feed quantity, quantity for the button on the device
 - Status LED switch, power
+- **Feed chamber empty** and device-error warnings, auger state, last feeding
+- **Feeding plan** with times, amounts and weekdays
 
 ### 🌊 Pump (EccoFlow)
 - Power, operating mode, smart-feed pause, power limit
 - Maintenance timer resets (pump cleaning, impeller)
 - Speed, flow rate, effect, night mode and power profile as sensors
 
-### 📊 Dashboard card (lighting)
+### 📊 Dashboard cards
 - **Daily curve** of the active profile (W/R/G/B over 24 h) with a "now" marker
 - Profile row, manual-mode switch and four colour sliders
 - **Two layouts:** full or compact (single row)
@@ -65,7 +67,11 @@ entities. New device types therefore show up on their own.
 - **Ships with the integration** and is registered automatically — no manual
   resource entry needed
 
-English and German are included; the card follows your Home Assistant language.
+There is a second card for the **SmartFeed**: feeding plan with times and weekdays,
+a large *Feed now* button (disabled while the auger runs), quantity slider, status
+LED, chamber state and last feeding. Same two layouts, same two designs.
+
+English and German are included; the cards follow your Home Assistant language.
 
 ---
 
@@ -80,8 +86,22 @@ Lighting devices:
 | `switch.<name>_automatic_mode` | Schedule on/off |
 | `sensor.<name>_profile` | Active profile; exposes the daily curve as attribute `time_events` |
 
-Feeder and pump get entities derived from their traits — buttons, switches,
-selects and numbers where the range is known, sensors otherwise.
+Feeder (SmartFeed):
+
+| Entity | Description |
+|---|---|
+| `button.<name>_feed_now` | Feeds the configured quantity |
+| `number.<name>_feed_quantity` | Feed quantity 1–8 |
+| `number.<name>_feed_quantity_device_button` | Quantity for the button on the device |
+| `switch.<name>_power` / `_status_led` | Power and status LED |
+| `binary_sensor.<name>_feed_chamber_empty` | Chamber empty warning |
+| `binary_sensor.<name>_device_error` | Device error channel |
+| `sensor.<name>_feed_motor` | Auger: idle / running |
+| `sensor.<name>_last_feeding` | Timestamp of the last feeding |
+| `sensor.<name>_feeding_plan` | Plan name; times, amounts and weekdays as attributes |
+
+The pump gets entities derived from its traits — switches, a select and buttons
+where the specification defines a clear value range, sensors otherwise.
 
 > **Automatic vs. manual (lighting):** While the schedule is running, the lamp
 > ignores manual commands — exactly like the app, where the sliders are greyed out.
@@ -107,12 +127,12 @@ selects and numbers where the range is known, sensors otherwise.
 then enter the email and password of your MyJUWEL account (same as in the app).
 
 ### Dashboard card
-**Nothing to do** — the integration ships the card, serves it and registers the
+**Nothing to do** — the integration ships both cards, serves them and registers the
 resource entry automatically (and bumps it on updates so no browser cache gets in
-the way). Just pick **Add card → "Juwel HeliaLux"** in the card picker.
+the way). Just pick **Add card → "Juwel HeliaLux"** or **"Juwel SmartFeed"** in the card picker.
 
 > **Lovelace in YAML mode?** Add the resource yourself:
-> `/juwel_appcontrol/juwel-helialux-card.js` as **module**.
+> `/juwel_appcontrol/juwel-appcontrol-cards.js` as **module**.
 
 ---
 
@@ -138,6 +158,22 @@ design: ha
 tap_action: popup
 ```
 
+### Feeder card
+
+| Option | Values | Meaning |
+|---|---|---|
+| `plan_sensor` | entity | The feeding-plan sensor; everything else is discovered automatically |
+| `name` | text | Custom heading |
+| `layout` | `full` \| `compact` | Full card or a single row |
+| `design` | `juwel` \| `ha` | MyJUWEL look or your Home Assistant theme |
+| `tap_action` | `popup` \| `more-info` \| `none` | What happens on tap |
+
+```yaml
+type: custom:juwel-feeder-card
+plan_sensor: sensor.my_feeder_feeding_plan
+design: ha
+```
+
 ---
 
 ## Notes
@@ -146,8 +182,11 @@ tap_action: popup
 - This uses the **unofficial** manufacturer API (`app-api.prod.qconnex.io`).
   If Juwel changes it, the integration has to be adapted. No warranty, and no
   affiliation with JUWEL Aquarium GmbH & Co. KG.
-- Tested with **HeliaLux AppControl**, firmware V2.0.1.3
-  (`@juwel.lighting.helialux1`) on Home Assistant 2026.9.
+- Tested with **HeliaLux AppControl** (firmware V2.0.1.3) and **SmartFeed
+  AppControl** (firmware V2.0.1.58) on Home Assistant 2026.9.
+- The manufacturer's product catalogue declares some values as objects where the
+  devices actually use plain numbers. The integration mirrors whatever the device
+  reports instead of trusting the schema — verified on both devices.
 - The older **HeliaLux SmartControl** is *not* supported by this integration. It has
   a local web interface and is covered by
   [MrSleeps/Juwel-HeliaLux-Home-Assistant-Custom-Component](https://github.com/MrSleeps/Juwel-HeliaLux-Home-Assistant-Custom-Component)

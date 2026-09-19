@@ -49,9 +49,9 @@ class JuwelTraitSelect(JuwelEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        value = self._state.get(self._spec.msg_key)
+        value = self._optimistic(self._state.get(self._spec.msg_key))
         return str(value) if value is not None else None
 
     async def async_select_option(self, option: str) -> None:
         await self.coordinator.client.set_trait(self._cid, self._spec.msg_key, option)
-        await self.coordinator.async_request_refresh()
+        self._note_write(option)

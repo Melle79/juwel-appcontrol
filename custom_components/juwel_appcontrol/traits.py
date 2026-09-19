@@ -94,6 +94,24 @@ def parse_traits(product_config: dict[str, Any] | None) -> dict[str, TraitSpec]:
     return specs
 
 
+def device_type(data: dict[str, Any]) -> str:
+    """Device type from the product catalogue ('light', 'feeder', 'eccoflow')."""
+    return str((data.get("product") or {}).get("deviceTypeId") or "")
+
+
+def encode(current: Any, target: Any, prop: str | None) -> Any:
+    """Encode a value the same way the device reports it.
+
+    The product catalogue frequently declares an object where the device
+    actually uses a plain scalar (verified on HeliaLux brightness and on
+    SmartFeed feed_quantity / led_switch). So we mirror what we read instead
+    of trusting the schema.
+    """
+    if isinstance(current, dict) and prop:
+        return {**current, prop: target}
+    return target
+
+
 def slug(trait: str) -> str:
     """'@core/traits/feed-quantity' -> 'feed_quantity' (used as translation key)."""
     return trait.rsplit("/", 1)[-1].replace("-", "_")

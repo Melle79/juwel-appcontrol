@@ -98,6 +98,15 @@ class JuwelCloud:
     async def get_settings(self) -> dict[str, Any]:
         return await self._request("GET", "/settings")
 
+    async def get_feeder_presets(self) -> list[dict[str, Any]]:
+        """Feeding plans (times, amounts, weekdays)."""
+        try:
+            data = await self._request("GET", "/presets/feeder")
+            return data if isinstance(data, list) else []
+        except JuwelApiError as err:
+            _LOGGER.debug("Futterplaene nicht abrufbar: %s", err)
+            return []
+
     async def get_product_config(self, product_id: str) -> dict[str, Any] | None:
         """Fähigkeitsbeschreibung eines Produkts (traits mit msg_key/Schema)."""
         try:

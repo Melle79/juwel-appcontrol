@@ -3,17 +3,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import JuwelCoordinator
 from .entity import JuwelEntity
-from .traits import LIGHT_TRAITS, SKIP_TRAITS, TraitSpec, slug
+from .traits import LIGHT_TRAITS, SKIP_TRAITS, TraitSpec, device_type, slug
 
 
 async def async_setup_entry(
@@ -37,6 +38,13 @@ async def async_setup_entry(
                 continue
             entities.append(JuwelTraitSensor(coordinator, cid, spec))
 
+        # Diese Felder tauchen im Geraetezustand erst nach der ersten Nutzung
+        # auf - deshalb am Geraetetyp festmachen, nicht am aktuellen Zustand.
+        if device_type(data) == "feeder":
+            entities.append(JuwelMotorSensor(coordinator, cid))
+            entities.append(JuwelLastFeedSensor(coordinator, cid))
+            entities.append(JuwelFeedPlanSensor(coordinator, cid))
+
     async_add_entities(entities)
 
 
@@ -56,6 +64,159 @@ def _has_control(spec: TraitSpec, data: dict[str, Any]) -> bool:
     if spec.numeric_property():
         return True
     return False
+
+
+# Weekday numbering confirmed on hardware: a plan for Monday/Thursday/Saturday
+# is stored as "1,4,6", so 0 = Sunday ... 6 = Saturday.
+WEEKDAY_NAMES = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+
+
+def _weekdays(raw: str) -> tuple[list[int], str]:
+    """Parse the weekday field of commandInterval ("*" or e.g. "1,4,6")."""
+    raw = (raw or "").strip()
+    if not raw or raw == "*":
+        return list(range(7)), "every day"
+    days: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if part.isdigit() and 0 <= int(part) <= 6:
+            days.append(int(part))
+    return days, ", ".join(WEEKDAY_NAMES[d] for d in days)
+
+
+class JuwelFeedPlanSensor(JuwelEntity, SensorEntity):
+    """The feeding plan assigned to this feeder.
+
+    Structure verified on hardware:
+        {"id": "...", "name": "Täglich füttern 1", "type": "user",
+         "timeEvents": [{"time": 1080, "value": {"amount": 1}}],
+         "commandInterval": "* * 1,4,6;"}
+    `time` is minutes since midnight, `amount` the feed quantity, and the last
+    field of `commandInterval` lists the weekdays ("*" = every day).
+    """
+
+    _attr_translation_key = "feed_plan"
+    _attr_icon = "mdi:calendar-clock"
+
+    def __init__(self, coordinator: JuwelCoordinator, cloud_device_id: str) -> None:
+        super().__init__(coordinator, cloud_device_id)
+        self._attr_unique_id = f"{cloud_device_id}_feed_plan"
+
+    @property
+    def _plan(self) -> dict[str, Any] | None:
+        data = self.coordinator.data.get(self._cid, {})
+        wanted = (data.get("info") or {}).get("fishFeederPresetIdList") or []
+        presets = data.get("feeder_presets") or []
+        for pid in wanted:
+            for preset in presets:
+                if str(preset.get("id")) == str(pid):
+                    return preset
+        return None
+
+    @property
+    def native_value(self) -> str | None:
+        plan = self._plan
+        if plan:
+            return plan.get("name")
+        return "none"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        plan = self._plan
+        if not plan:
+            return self._related_feeder_entities()
+        feedings = []
+        for ev in plan.get("timeEvents") or []:
+            minutes = ev.get("time")
+            amount = (ev.get("value") or {}).get("amount")
+            if minutes is None:
+                continue
+            feedings.append(
+                {"time": f"{int(minutes) // 60:02d}:{int(minutes) % 60:02d}",
+                 "minutes": minutes, "amount": amount}
+            )
+        feedings.sort(key=lambda f: f["minutes"])
+        interval = str(plan.get("commandInterval") or "").strip().rstrip(";")
+        raw_days = interval.split(" ")[-1] if interval else ""
+        days, names = _weekdays(raw_days)
+        return {
+            "plan_id": plan.get("id"),
+            "plan_type": plan.get("type"),
+            "feedings": feedings,
+            "feedings_per_day": len(feedings),
+            "weekdays": days,
+            "weekdays_text": names,
+            "command_interval": plan.get("commandInterval"),
+            **self._related_feeder_entities(),
+        }
+
+    def _related_feeder_entities(self) -> dict[str, Any]:
+        """Entity-IDs des Geraets, damit die Karte sie ohne Namensraten findet."""
+        try:
+            reg = er.async_get(self.hass)
+        except Exception:  # noqa: BLE001
+            return {}
+
+        def find(domain: str, suffix: str) -> str | None:
+            return reg.async_get_entity_id(domain, DOMAIN, f"{self._cid}_{suffix}")
+
+        related = {
+            "feed_button": find("button", "feed_now"),
+            "quantity_entity": find("number", "feed_quantity"),
+            "key_quantity_entity": find("number", "feed_key_quantity"),
+            "led_entity": find("switch", "led_switch"),
+            "power_entity": find("switch", "status"),
+            "chamber_entity": find("binary_sensor", "feed_chamber_status"),
+            "error_entity": find("binary_sensor", "error"),
+            "motor_entity": find("sensor", "feed_motor_state"),
+            "last_feed_entity": find("sensor", "last_feed"),
+        }
+        return {k: v for k, v in related.items() if v}
+
+
+class JuwelLastFeedSensor(JuwelEntity, SensorEntity):
+    """Timestamp of the last feeding.
+
+    Verified on hardware: `last_feed_ts` carries the unix time of the most
+    recent feeding (manual or scheduled); 0 means "never".
+    """
+
+    _attr_translation_key = "last_feed"
+    _attr_icon = "mdi:clock-check-outline"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, coordinator: JuwelCoordinator, cloud_device_id: str) -> None:
+        super().__init__(coordinator, cloud_device_id)
+        self._attr_unique_id = f"{cloud_device_id}_last_feed"
+
+    @property
+    def native_value(self) -> Any:
+        ts = self._state.get("last_feed_ts")
+        if not ts:
+            return None
+        return dt_util.utc_from_timestamp(int(ts))
+
+
+class JuwelMotorSensor(JuwelEntity, SensorEntity):
+    """Feed motor state. Verified on hardware: 0 = idle, 2 = running."""
+
+    _attr_translation_key = "feed_motor_state"
+    _attr_icon = "mdi:engine-outline"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: JuwelCoordinator, cloud_device_id: str) -> None:
+        super().__init__(coordinator, cloud_device_id)
+        self._attr_unique_id = f"{cloud_device_id}_feed_motor_state"
+
+    @property
+    def native_value(self) -> Any:
+        from .binary_sensor import MOTOR_STATES
+        raw = self._state.get("feed_motor_status")
+        return MOTOR_STATES.get(raw, raw)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"raw": self._state.get("feed_motor_status")}
 
 
 class JuwelTraitSensor(JuwelEntity, SensorEntity):

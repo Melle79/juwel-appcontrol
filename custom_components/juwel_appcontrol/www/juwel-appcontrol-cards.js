@@ -31,6 +31,11 @@ const I18N = {
     oJuwel: "MyJUWEL look (dark blue)", oHa: "Follow Home Assistant theme",
     oPopup: "Open the full card as a pop-up", oMore: "Show more-info dialog",
     oHash: "Open a Bubble Card pop-up by hash", oNone: "Do nothing",
+    plan: "Plan", feedNow: "Feed now", feeding: "Feeding…",
+    quantity: "Quantity", statusLed: "Status LED",
+    chamber: "Feed chamber", chamberEmpty: "Empty", chamberOk: "Filled",
+    motor: "Auger", lastFeed: "Last feeding", never: "never",
+    noPlan: "no plan", amount: "amount", fFeeder: "Feeder (Juwel AppControl)",
   },
   de: {
     status: "Status", online: "Online", offline: "Offline",
@@ -44,6 +49,11 @@ const I18N = {
     oJuwel: "MyJUWEL-Look (dunkelblau)", oHa: "Home-Assistant-Theme übernehmen",
     oPopup: "Große Karte als Popup öffnen", oMore: "Detailansicht (more-info)",
     oHash: "Bubble-Card-Popup per Hash öffnen", oNone: "Nichts tun",
+    plan: "Plan", feedNow: "Jetzt füttern", feeding: "Füttert…",
+    quantity: "Menge", statusLed: "Status-LED",
+    chamber: "Futterkammer", chamberEmpty: "Leer", chamberOk: "Gefüllt",
+    motor: "Futterschnecke", lastFeed: "Letzte Fütterung", never: "nie",
+    noPlan: "kein Plan", amount: "Menge", fFeeder: "Futterautomat (Juwel AppControl)",
   },
 };
 
@@ -578,3 +588,365 @@ window.customCards.push({
 });
 
 console.info("%c JUWEL-HELIALUX-CARD %c v2.0.0 ", "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");
+
+/* ======================================================================
+ *  Juwel Feeder Card  —  SmartFeed AppControl
+ *  Reads its sibling entities from the feeding-plan sensor's attributes,
+ *  so discovery does not depend on entity names or the UI language.
+ * ==================================================================== */
+
+class JuwelFeederCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+  }
+
+  static getConfigElement() {
+    return document.createElement("juwel-feeder-card-editor");
+  }
+
+  static getStubConfig(hass) {
+    const s = Object.keys(hass.states).find(
+      (e) => e.startsWith("sensor.") && hass.states[e].attributes.feed_button
+    );
+    return { plan_sensor: s || "", design: "juwel", layout: "full" };
+  }
+
+  setConfig(config) {
+    if (!config.plan_sensor && !config.entity) {
+      throw new Error("Please choose the feeding plan sensor of your SmartFeed.");
+    }
+    this._config = { design: "juwel", layout: "full", tap_action: "popup", ...config };
+    this._anchor = config.plan_sensor || config.entity;
+    this._built = false;
+  }
+
+  getCardSize() {
+    if (!this._config) return 4;
+    return this._config.layout === "compact" ? 1 : 5;
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._config) return;
+    this._render();
+    if (this._popupCard) this._popupCard.hass = hass;
+  }
+
+  _st(id) {
+    return id && this._hass.states[id];
+  }
+
+  _ids() {
+    const a = (this._st(this._anchor) || {}).attributes || {};
+    return {
+      plan: this._anchor,
+      feed: a.feed_button,
+      qty: a.quantity_entity,
+      led: a.led_entity,
+      power: a.power_entity,
+      chamber: a.chamber_entity,
+      error: a.error_entity,
+      motor: a.motor_entity,
+      last: a.last_feed_entity,
+    };
+  }
+
+  _build() {
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host{
+          --jh-bg:#0b2239; --jh-fg:#ffffff; --jh-sub:rgba(255,255,255,.85);
+          --jh-row:#12314f; --jh-grid:rgba(255,255,255,.13);
+          --jh-track:rgba(255,255,255,.12); --jh-swoff:#0d1b2a; --jh-swon:#2b6cb0;
+          --jh-accent:#2b6cb0; --jh-radius:22px;
+        }
+        :host([data-design="ha"]){
+          --jh-bg:var(--ha-card-background, var(--card-background-color, #fff));
+          --jh-fg:var(--primary-text-color);
+          --jh-sub:var(--secondary-text-color);
+          --jh-row:var(--secondary-background-color, rgba(127,127,127,.12));
+          --jh-grid:var(--divider-color, rgba(127,127,127,.3));
+          --jh-track:var(--divider-color, rgba(127,127,127,.25));
+          --jh-swoff:var(--switch-unchecked-track-color, rgba(127,127,127,.4));
+          --jh-swon:var(--primary-color); --jh-accent:var(--primary-color);
+          --jh-radius:var(--ha-card-border-radius, 12px);
+        }
+        ha-card{background:var(--jh-bg);color:var(--jh-fg);
+                border-radius:var(--jh-radius);overflow:hidden}
+        .full{padding:16px 18px 20px}
+        .compact{padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer}
+        .head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+        .icon{width:32px;height:32px;flex:0 0 auto;opacity:.9;color:var(--jh-fg)}
+        .title{font-size:1.2rem;font-weight:600;line-height:1.2}
+        .status{font-size:.85rem;color:var(--jh-sub)}
+        .ok{color:#41d07e;font-weight:600}.bad{color:#ff6b6b;font-weight:600}
+        .prow{background:var(--jh-row);border-radius:16px;padding:10px 14px;margin-top:12px}
+        .plan{font-weight:600}
+        .times{font-size:.85rem;color:var(--jh-sub);margin-top:3px}
+        .feed{
+          width:100%;margin-top:14px;padding:14px;border:0;border-radius:16px;
+          background:var(--jh-accent);color:#fff;font-size:1.05rem;font-weight:600;
+          cursor:pointer;font-family:inherit;
+        }
+        .feed:active{filter:brightness(.9)}
+        .feed[disabled]{opacity:.6;cursor:default}
+        .sl{display:flex;align-items:center;gap:12px;margin:16px 2px 4px}
+        .sl .lab{color:var(--jh-sub);min-width:58px}
+        .track{position:relative;flex:1;height:14px;border-radius:7px;cursor:pointer;
+               background:var(--jh-track)}
+        .fill{position:absolute;top:0;bottom:0;left:0;border-radius:7px;
+              background:var(--jh-accent);opacity:.95}
+        .grip{position:absolute;top:50%;width:24px;height:24px;border-radius:50%;
+              background:#fff;transform:translate(-50%,-50%);box-shadow:0 1px 4px rgba(0,0,0,.45)}
+        .val{width:28px;text-align:right;font-variant-numeric:tabular-nums}
+        .toggle-row{display:flex;align-items:center;gap:14px;margin:14px 2px 2px}
+        .sw{width:52px;height:28px;border-radius:14px;background:var(--jh-swoff);
+            position:relative;cursor:pointer;flex:0 0 auto;border:1px solid var(--jh-grid)}
+        .sw.on{background:var(--jh-swon)}
+        .knob{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+              background:#fff;transition:left .2s}
+        .sw.on .knob{left:27px}
+        .facts{margin-top:14px;border-top:1px solid var(--jh-grid);padding-top:10px}
+        .fact{display:flex;justify-content:space-between;font-size:.9rem;margin:6px 0}
+        .fact .k{color:var(--jh-sub)}
+        .warn{color:#ffb020;font-weight:600}
+        .c-vals{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:.95rem}
+        .c-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .err{padding:16px;color:#ff8a8a}
+      </style>
+      <ha-card><div id="body"></div></ha-card>`;
+    this._built = true;
+  }
+
+  _render() {
+    if (!this._hass || !this._config) return;
+    if (!this._built) this._build();
+    this.setAttribute("data-design", this._config.design === "ha" ? "ha" : "juwel");
+    const T = t(this._hass);
+    const body = this.shadowRoot.getElementById("body");
+    const ids = this._ids();
+    const plan = this._st(ids.plan);
+
+    if (!plan) {
+      body.innerHTML = `<div class="err">${T.notFound}: <code>${this._anchor}</code></div>`;
+      return;
+    }
+
+    const a = plan.attributes || {};
+    const name = this._config.name || (a.friendly_name || "").replace(/\s*\S+$/, "") ||
+                 plan.attributes.friendly_name || "SmartFeed";
+    const chamber = this._st(ids.chamber);
+    const empty = chamber && chamber.state === "on";
+    const motor = this._st(ids.motor);
+    const busy = motor && motor.state === "running";
+    const last = this._st(ids.last);
+    const online = plan.state !== "unavailable";
+
+    const lastTxt = last && last.state && last.state !== "unknown"
+      ? new Date(last.state).toLocaleString(this._hass.language || "en",
+          { dateStyle: "short", timeStyle: "short" })
+      : T.never;
+
+    if (this._config.layout === "compact") {
+      body.className = "compact";
+      body.innerHTML = `
+        <div class="c-name">${name}</div>
+        <div class="c-vals">
+          ${empty ? `<span class="warn">${T.chamberEmpty}</span>` : ""}
+          <span>${lastTxt}</span>
+        </div>`;
+      body.onclick = () => this._tap();
+      return;
+    }
+
+    body.className = "full";
+    body.onclick = null;
+    const times = (a.feedings || [])
+      .map((f) => `${f.time} · ${T.amount} ${f.amount}`)
+      .join("   •   ");
+
+    body.innerHTML = `
+      <div class="head">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 4c4.4 0 8 3.1 8 7s-3.6 7-8 7c-1.7 0-3.3-.5-4.6-1.3L4 18l1.2-3A6.6 6.6 0 0 1 4 11c0-3.9 3.6-7 8-7zm4 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
+        </svg>
+        <div>
+          <div class="title">${name}</div>
+          <div class="status">${T.status}:
+            <span class="${online ? "ok" : "bad"}">${online ? T.online : T.offline}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prow">
+        <div class="plan">${T.plan}: ${plan.state === "none" ? T.noPlan : plan.state}</div>
+        ${times ? `<div class="times">${times}${a.weekdays_text ? "   •   " + a.weekdays_text : ""}</div>` : ""}
+      </div>
+
+      <button class="feed" id="feed" ${busy || !ids.feed ? "disabled" : ""}>
+        ${busy ? T.feeding : T.feedNow}
+      </button>
+
+      ${ids.qty ? this._slider(T, ids.qty) : ""}
+      ${ids.led ? this._toggle(T, ids.led) : ""}
+
+      <div class="facts">
+        <div class="fact"><span class="k">${T.chamber}</span>
+          <span class="${empty ? "warn" : ""}">${empty ? T.chamberEmpty : T.chamberOk}</span></div>
+        ${motor ? `<div class="fact"><span class="k">${T.motor}</span><span>${motor.state}</span></div>` : ""}
+        <div class="fact"><span class="k">${T.lastFeed}</span><span>${lastTxt}</span></div>
+      </div>`;
+
+    this._wire(ids);
+  }
+
+  _slider(T, entityId) {
+    const st = this._st(entityId);
+    const min = (st && st.attributes.min) || 1;
+    const max = (st && st.attributes.max) || 8;
+    const val = st ? Number(st.state) : min;
+    const pct = ((val - min) / Math.max(1, max - min)) * 100;
+    return `
+      <div class="sl">
+        <div class="lab">${T.quantity}</div>
+        <div class="track" id="qty" data-min="${min}" data-max="${max}">
+          <div class="fill" style="width:${pct}%"></div>
+          <div class="grip" style="left:${pct}%"></div>
+        </div>
+        <div class="val" id="qtyval">${val}</div>
+      </div>`;
+  }
+
+  _toggle(T, entityId) {
+    const on = (this._st(entityId) || {}).state === "on";
+    return `
+      <div class="toggle-row">
+        <div class="sw ${on ? "on" : ""}" id="led"><div class="knob"></div></div>
+        <div>${T.statusLed}</div>
+      </div>`;
+  }
+
+  _wire(ids) {
+    const feed = this.shadowRoot.getElementById("feed");
+    if (feed && ids.feed) {
+      feed.onclick = () =>
+        this._hass.callService("button", "press", { entity_id: ids.feed });
+    }
+
+    const led = this.shadowRoot.getElementById("led");
+    if (led && ids.led) {
+      led.onclick = () => {
+        const on = this._hass.states[ids.led].state === "on";
+        this._hass.callService("switch", on ? "turn_off" : "turn_on", {
+          entity_id: ids.led,
+        });
+      };
+    }
+
+    const track = this.shadowRoot.getElementById("qty");
+    if (track && ids.qty) {
+      const min = Number(track.dataset.min), max = Number(track.dataset.max);
+      const apply = (ev) => {
+        const r = track.getBoundingClientRect();
+        const x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+        const frac = Math.max(0, Math.min(1, x / r.width));
+        const v = Math.round(min + frac * (max - min));
+        const pct = ((v - min) / Math.max(1, max - min)) * 100;
+        track.querySelector(".fill").style.width = pct + "%";
+        track.querySelector(".grip").style.left = pct + "%";
+        const lbl = this.shadowRoot.getElementById("qtyval");
+        if (lbl) lbl.textContent = v;
+        return v;
+      };
+      track.onpointerdown = (e) => { track.setPointerCapture(e.pointerId); this._drag = true; apply(e); };
+      track.onpointermove = (e) => { if (this._drag) apply(e); };
+      track.onpointerup = (e) => {
+        if (!this._drag) return;
+        this._drag = false;
+        this._hass.callService("number", "set_value",
+          { entity_id: ids.qty, value: apply(e) });
+      };
+    }
+  }
+
+  _tap() {
+    if (this._config.tap_action === "none") return;
+    if (this._config.tap_action === "more-info") {
+      this.dispatchEvent(new CustomEvent("hass-more-info", {
+        detail: { entityId: this._anchor }, bubbles: true, composed: true }));
+      return;
+    }
+    if (this._dialog) return;
+    const dlg = document.createElement("ha-dialog");
+    dlg.setAttribute("hideactions", "");
+    dlg.heading = this._config.name || "SmartFeed";
+    dlg.style.setProperty("--dialog-content-padding", "0");
+    dlg.style.setProperty("--mdc-dialog-min-width", "min(94vw, 420px)");
+    const card = document.createElement("juwel-feeder-card");
+    card.setConfig({ ...this._config, layout: "full", tap_action: "none" });
+    card.hass = this._hass;
+    dlg.appendChild(card);
+    dlg.addEventListener("closed", () => {
+      dlg.remove(); this._dialog = null; this._popupCard = null;
+    });
+    document.body.appendChild(dlg);
+    this._dialog = dlg;
+    this._popupCard = card;
+    dlg.open = true;
+  }
+}
+
+class JuwelFeederCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = { design: "juwel", layout: "full", tap_action: "popup", ...config };
+    this._render();
+  }
+  set hass(hass) { this._hass = hass; this._render(); }
+  _render() {
+    if (!this._hass || !this._config) return;
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.addEventListener("value-changed", (ev) => {
+        this._config = ev.detail.value;
+        this.dispatchEvent(new CustomEvent("config-changed",
+          { detail: { config: this._config } }));
+      });
+      this.appendChild(this._form);
+    }
+    const T = t(this._hass);
+    this._form.hass = this._hass;
+    this._form.data = this._config;
+    this._form.schema = [
+      { name: "plan_sensor", required: true,
+        selector: { entity: { domain: "sensor", integration: "juwel_appcontrol" } } },
+      { name: "name", selector: { text: {} } },
+      { name: "layout", selector: { select: { mode: "dropdown", options: [
+          { value: "full", label: T.oFull }, { value: "compact", label: T.oCompact }] } } },
+      { name: "design", selector: { select: { mode: "dropdown", options: [
+          { value: "juwel", label: T.oJuwel }, { value: "ha", label: T.oHa }] } } },
+      { name: "tap_action", selector: { select: { mode: "dropdown", options: [
+          { value: "popup", label: T.oPopup }, { value: "more-info", label: T.oMore },
+          { value: "none", label: T.oNone }] } } },
+    ];
+    this._form.computeLabel = (s) => ({
+      plan_sensor: T.fFeeder, name: T.fName, layout: T.fLayout,
+      design: T.fDesign, tap_action: T.fTap,
+    }[s.name] || s.name);
+  }
+}
+
+if (!customElements.get("juwel-feeder-card")) {
+  customElements.define("juwel-feeder-card", JuwelFeederCard);
+}
+if (!customElements.get("juwel-feeder-card-editor")) {
+  customElements.define("juwel-feeder-card-editor", JuwelFeederCardEditor);
+}
+if (!window.customCards.some((c) => c.type === "juwel-feeder-card"))
+  window.customCards.push({
+    type: "juwel-feeder-card",
+    name: "Juwel SmartFeed",
+    description: "Aquarium feeder: plan, feed now, quantity and chamber status",
+    preview: true,
+    documentationURL: "https://github.com/Melle79/juwel-appcontrol",
+  });

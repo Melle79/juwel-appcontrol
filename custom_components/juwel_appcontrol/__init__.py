@@ -25,6 +25,7 @@ from .coordinator import JuwelCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
     Platform.BUTTON,
     Platform.LIGHT,
     Platform.NUMBER,
@@ -80,12 +81,22 @@ async def _async_sync_lovelace_resource(
             await resources.async_load()
             resources.loaded = True
 
-        for item in resources.async_items():
-            if item.get("url", "").split("?")[0] == base_url:
-                if item["url"] != versioned_url:
+        found = False
+        for item in list(resources.async_items()):
+            url = item.get("url", "")
+            if not url.startswith(CARD_URL_BASE + "/"):
+                continue
+            if url.split("?")[0] == base_url:
+                found = True
+                if url != versioned_url:
                     await resources.async_update_item(item["id"], {"url": versioned_url})
                     _LOGGER.debug("Karten-Ressource aktualisiert: %s", versioned_url)
-                return
+            else:
+                # Zeigt auf eine frühere, inzwischen umbenannte Kartendatei
+                await resources.async_delete_item(item["id"])
+                _LOGGER.debug("Veraltete Karten-Ressource entfernt: %s", url)
+        if found:
+            return
 
         await resources.async_create_item({"res_type": "module", "url": versioned_url})
         _LOGGER.debug("Karten-Ressource angelegt: %s", versioned_url)

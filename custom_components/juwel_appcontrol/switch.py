@@ -65,15 +65,15 @@ class JuwelAutoSwitch(JuwelEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool:
-        return self._state.get("mode") == "auto"
+        return self._optimistic(self._state.get("mode")) == "auto"
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self.coordinator.client.resume_schedule(self._cid)
-        await self.coordinator.async_request_refresh()
+        self._note_write("auto")
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.coordinator.client.pause_schedule(self._cid)
-        await self.coordinator.async_request_refresh()
+        self._note_write("rgb")
 
 
 class JuwelTraitSwitch(JuwelEntity, SwitchEntity):
@@ -99,7 +99,7 @@ class JuwelTraitSwitch(JuwelEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool | None:
-        value = self._state.get(self._spec.msg_key)
+        value = self._optimistic(self._state.get(self._spec.msg_key))
         if value is None:
             return None
         on_value, _ = self._on_off_values()
@@ -107,10 +107,9 @@ class JuwelTraitSwitch(JuwelEntity, SwitchEntity):
 
     async def _set(self, on: bool) -> None:
         on_value, off_value = self._on_off_values()
-        await self.coordinator.client.set_trait(
-            self._cid, self._spec.msg_key, on_value if on else off_value
-        )
-        await self.coordinator.async_request_refresh()
+        target = on_value if on else off_value
+        await self.coordinator.client.set_trait(self._cid, self._spec.msg_key, target)
+        self._note_write(target)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self._set(True)

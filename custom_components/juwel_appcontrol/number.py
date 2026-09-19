@@ -13,7 +13,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .coordinator import JuwelCoordinator
 from .entity import JuwelEntity
-from .traits import T_FEED, TraitSpec, slug
+from .traits import T_FEED, TraitSpec, encode, slug
 
 
 @dataclass(frozen=True)
@@ -133,13 +133,16 @@ class JuwelTraitNumber(JuwelEntity, NumberEntity):
         value = self._state.get(self._spec.msg_key)
         if isinstance(value, dict):
             value = value.get(self._prop)
+        value = self._optimistic(value)
         try:
             return float(value)  # type: ignore[arg-type]
         except (TypeError, ValueError):
             return None
 
     async def async_set_native_value(self, value: float) -> None:
+        current = self._state.get(self._spec.msg_key)
+        target = int(value)
         await self.coordinator.client.set_trait(
-            self._cid, self._spec.msg_key, {self._prop: int(value)}
+            self._cid, self._spec.msg_key, encode(current, target, self._prop)
         )
-        await self.coordinator.async_request_refresh()
+        self._note_write(target)

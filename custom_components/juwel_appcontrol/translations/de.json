@@ -118,6 +118,23 @@
       },
       "mode": {
         "name": "Modus"
+      },
+      "feed_motor_state": {
+        "name": "Futterschnecke"
+      },
+      "last_feed": {
+        "name": "Letzte Fütterung"
+      },
+      "feed_plan": {
+        "name": "Futterplan"
+      }
+    },
+    "binary_sensor": {
+      "feed_chamber_empty": {
+        "name": "Futterkammer leer"
+      },
+      "device_error": {
+        "name": "Gerätefehler"
       }
     }
   }

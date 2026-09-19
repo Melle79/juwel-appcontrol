@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .coordinator import JuwelCoordinator
 from .entity import JuwelEntity
-from .traits import T_FEED, T_FEED_QUANTITY, T_TIMER_RESET, TraitSpec
+from .traits import T_FEED, T_FEED_QUANTITY, T_TIMER_RESET, TraitSpec, encode
 
 
 async def async_setup_entry(
@@ -78,8 +78,9 @@ class JuwelFeedButton(JuwelEntity, ButtonEntity):
     async def async_press(self) -> None:
         prop = self._spec.numeric_property()
         key = prop[0] if prop else "feed"
+        current = self._state.get(self._spec.msg_key)
         await self.coordinator.client.set_trait(
-            self._cid, self._spec.msg_key, {key: self._amount()}
+            self._cid, self._spec.msg_key, encode(current, self._amount(), key)
         )
         await self.coordinator.async_request_refresh()
 

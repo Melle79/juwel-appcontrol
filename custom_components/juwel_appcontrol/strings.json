@@ -118,6 +118,23 @@
       },
       "mode": {
         "name": "Mode"
+      },
+      "feed_motor_state": {
+        "name": "Feed motor"
+      },
+      "last_feed": {
+        "name": "Last feeding"
+      },
+      "feed_plan": {
+        "name": "Feeding plan"
+      }
+    },
+    "binary_sensor": {
+      "feed_chamber_empty": {
+        "name": "Feed chamber empty"
+      },
+      "device_error": {
+        "name": "Device error"
       }
     }
   }
