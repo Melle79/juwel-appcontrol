@@ -1,6 +1,6 @@
 /*
- * Juwel HeliaLux Card  v1.4.0
- * Lovelace card for the "juwel_helialux" integration.
+ * Juwel HeliaLux Card  v2.0.0
+ * Lovelace card for the "juwel_appcontrol" integration.
  *
  * Options (all available in the visual editor):
  *   design : "juwel" (MyJUWEL look) | "ha" (follow the Home Assistant theme)
@@ -500,7 +500,7 @@ class JuwelHelialuxCardEditor extends HTMLElement {
       {
         name: "light",
         required: true,
-        selector: { entity: { domain: "light", integration: "juwel_helialux" } },
+        selector: { entity: { domain: "light", integration: "juwel_appcontrol" } },
       },
       { name: "name", selector: { text: {} } },
       {
@@ -577,4 +577,4 @@ window.customCards.push({
   documentationURL: "https://github.com/Melle79/juwel-helialux",
 });
 
-console.info("%c JUWEL-HELIALUX-CARD %c v1.4.0 ", "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");
+console.info("%c JUWEL-HELIALUX-CARD %c v2.0.0 ", "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");

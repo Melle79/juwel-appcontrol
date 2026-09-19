@@ -1,6 +1,6 @@
 {
-  "domain": "juwel_helialux",
-  "name": "Juwel HeliaLux (MyJUWEL Cloud)",
+  "domain": "juwel_appcontrol",
+  "name": "Juwel HeliaLux AppControl",
   "codeowners": [
     "@Melle79"
   ],
@@ -15,5 +15,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Melle79/juwel-helialux/issues",
   "requirements": [],
-  "version": "1.4.0"
+  "version": "2.0.0"
 }

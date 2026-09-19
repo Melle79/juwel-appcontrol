@@ -1,4 +1,4 @@
-# Juwel HeliaLux – Home Assistant Integration
+# Juwel HeliaLux AppControl – Home Assistant Integration
 
 [![GitHub Release](https://img.shields.io/github/v/release/Melle79/juwel-helialux?style=flat-square)](https://github.com/Melle79/juwel-helialux/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
@@ -70,24 +70,24 @@ Created per device:
 
 ### HACS
 1. HACS → ⋮ → **Custom repositories** → add `https://github.com/Melle79/juwel-helialux` as **Integration**
-2. Install "Juwel HeliaLux"
+2. Install "Juwel HeliaLux AppControl"
 3. Restart Home Assistant
 
 ### Manual
-1. Copy `custom_components/juwel_helialux/` into `<config>/custom_components/`
+1. Copy `custom_components/juwel_appcontrol/` into `<config>/custom_components/`
 2. Restart Home Assistant
 
 ### Set up
-**Settings → Devices & services → Add integration → "Juwel HeliaLux"**,
+**Settings → Devices & services → Add integration → "Juwel HeliaLux AppControl"**,
 then enter the email and password of your MyJUWEL account (same as in the app).
 
 ### Dashboard card
 **Nothing to do** — the integration ships the card, serves it and registers the
 resource entry automatically (and bumps it on updates so no browser cache gets in
-the way). Just pick **Add card → "Juwel HeliaLux"**.
+the way). Just pick **Add card → "Juwel HeliaLux"** in the card picker.
 
 > **Lovelace in YAML mode?** Add the resource yourself:
-> `/juwel_helialux/juwel-helialux-card.js` as **module**.
+> `/juwel_appcontrol/juwel-helialux-card.js` as **module**.
 >
 > **Upgrading from ≤ 1.2.0?** Remove the old `/local/juwel-helialux-card.js`
 > resource entry and the file in `www/` — both are no longer needed.
@@ -126,8 +126,11 @@ tap_action: popup
   affiliation with JUWEL Aquarium GmbH & Co. KG.
 - Tested with **HeliaLux AppControl**, firmware V2.0.1.3
   (`@juwel.lighting.helialux1`) on Home Assistant 2026.9.
-- The older **HeliaLux SmartControl** is *not* supported — it has a local web
-  interface, and other integrations already cover it.
+- The older **HeliaLux SmartControl** is *not* supported by this integration. It has
+  a local web interface and is covered by
+  [MrSleeps/Juwel-HeliaLux-Home-Assistant-Custom-Component](https://github.com/MrSleeps/Juwel-HeliaLux-Home-Assistant-Custom-Component)
+  (domain `juwel_helialux`). This integration deliberately uses the separate domain
+  `juwel_appcontrol`, so both can be installed side by side.
 
 ---
 
