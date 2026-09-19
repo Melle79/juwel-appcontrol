@@ -1,6 +1,6 @@
 {
   "domain": "juwel_appcontrol",
-  "name": "Juwel HeliaLux AppControl",
+  "name": "Juwel AppControl",
   "codeowners": [
     "@Melle79"
   ],
@@ -10,10 +10,10 @@
     "frontend",
     "lovelace"
   ],
-  "documentation": "https://github.com/Melle79/juwel-helialux",
+  "documentation": "https://github.com/Melle79/juwel-appcontrol",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/Melle79/juwel-helialux/issues",
+  "issue_tracker": "https://github.com/Melle79/juwel-appcontrol/issues",
   "requirements": [],
-  "version": "2.0.0"
+  "version": "2.1.0"
 }

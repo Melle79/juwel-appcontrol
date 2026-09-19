@@ -10,6 +10,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import JuwelApiError, JuwelAuthError, JuwelCloud
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, LIGHT_PRODUCT_IDS
+from .traits import parse_traits
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,6 +27,8 @@ class JuwelCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         )
         self.client = client
         self.devices: dict[str, dict[str, Any]] = {}
+        # Produktkataloge werden einmal geholt und behalten
+        self._product_configs: dict[str, dict[str, Any] | None] = {}
 
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         try:
@@ -44,8 +47,6 @@ class JuwelCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
         result: dict[str, dict[str, Any]] = {}
         for dev in settings.get("devices", []):
-            if dev.get("productId") not in LIGHT_PRODUCT_IDS:
-                continue
             cid = dev.get("cloudDeviceId")
             if not cid:
                 continue
@@ -55,9 +56,20 @@ class JuwelCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             except JuwelApiError as err:
                 _LOGGER.warning("Zustand von %s nicht abrufbar: %s", dev.get("name"), err)
                 state = {"connected": False}
+            product_id = dev.get("productId") or ""
+            if product_id not in self._product_configs:
+                self._product_configs[product_id] = await self.client.get_product_config(
+                    product_id
+                )
+            product = self._product_configs[product_id]
+
             result[cid] = {
                 "info": dev,
                 "state": state,
+                "product": product,
+                "traits": parse_traits(product),
+                "is_light": (product or {}).get("deviceTypeId") == "light"
+                or product_id in LIGHT_PRODUCT_IDS,
                 "presets": presets,
                 "active_preset": _active_preset(dev, state, presets),
             }

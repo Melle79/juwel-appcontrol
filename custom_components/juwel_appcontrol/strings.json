@@ -20,17 +20,105 @@
     }
   },
   "entity": {
+    "button": {
+      "feed_now": {
+        "name": "Feed now"
+      },
+      "timer_reset_clean_pump": {
+        "name": "Reset pump cleaning timer"
+      },
+      "timer_reset_impeller": {
+        "name": "Reset impeller timer"
+      },
+      "timer_reset_all": {
+        "name": "Reset all timers"
+      }
+    },
     "number": {
-      "white": { "name": "White" },
-      "red": { "name": "Red" },
-      "green": { "name": "Green" },
-      "blue": { "name": "Blue" }
+      "white": {
+        "name": "White"
+      },
+      "red": {
+        "name": "Red"
+      },
+      "green": {
+        "name": "Green"
+      },
+      "blue": {
+        "name": "Blue"
+      },
+      "feed_quantity": {
+        "name": "Feed quantity"
+      },
+      "feed_key_quantity": {
+        "name": "Feed quantity (device button)"
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Operating mode"
+      }
     },
     "switch": {
-      "auto_mode": { "name": "Automatic mode" }
+      "auto_mode": {
+        "name": "Automatic mode"
+      },
+      "status": {
+        "name": "Power"
+      },
+      "power": {
+        "name": "Power"
+      },
+      "led_switch": {
+        "name": "Status LED"
+      },
+      "smart_feed": {
+        "name": "Smart feed"
+      },
+      "power_limit": {
+        "name": "Power limit"
+      }
     },
     "sensor": {
-      "preset": { "name": "Profile" }
+      "preset": {
+        "name": "Profile"
+      },
+      "speed": {
+        "name": "Speed"
+      },
+      "speed_lph": {
+        "name": "Flow rate"
+      },
+      "effect": {
+        "name": "Effect"
+      },
+      "effect_intensity": {
+        "name": "Effect intensity"
+      },
+      "night_mode": {
+        "name": "Night mode"
+      },
+      "power_profile": {
+        "name": "Power profile"
+      },
+      "temp_limits": {
+        "name": "Temperature limits"
+      },
+      "led_indicators": {
+        "name": "LED indicators"
+      },
+      "control": {
+        "name": "Control"
+      },
+      "status": {
+        "name": "Status"
+      },
+      "feed": {
+        "name": "Feed"
+      },
+      "mode": {
+        "name": "Mode"
+      }
     }
   }
 }

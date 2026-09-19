@@ -98,6 +98,20 @@ class JuwelCloud:
     async def get_settings(self) -> dict[str, Any]:
         return await self._request("GET", "/settings")
 
+    async def get_product_config(self, product_id: str) -> dict[str, Any] | None:
+        """Fähigkeitsbeschreibung eines Produkts (traits mit msg_key/Schema)."""
+        try:
+            return await self._request("GET", f"/config/product/{product_id}")
+        except JuwelApiError as err:
+            _LOGGER.debug("Produktkonfiguration %s nicht abrufbar: %s", product_id, err)
+            return None
+
+    async def set_trait(
+        self, cloud_device_id: str, msg_key: str, value: Any
+    ) -> None:
+        """Einen Trait-Wert setzen: {"payload": {"type": "request", msg_key: value}}."""
+        await self._set_state(cloud_device_id, {msg_key: value})
+
     async def get_presets(self) -> list[dict[str, Any]]:
         """Alle Profile inkl. Tageskurve (timeEvents)."""
         data = await self._request("GET", "/presets")

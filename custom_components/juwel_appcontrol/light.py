@@ -25,7 +25,11 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: JuwelCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(JuwelLight(coordinator, cid) for cid in coordinator.data)
+    async_add_entities(
+        JuwelLight(coordinator, cid)
+        for cid, data in coordinator.data.items()
+        if data.get("is_light")
+    )
 
 
 def _pct_to_255(pct: int) -> int:

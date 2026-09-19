@@ -5,6 +5,7 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -12,13 +13,82 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .coordinator import JuwelCoordinator
 from .entity import JuwelEntity
+from .traits import LIGHT_TRAITS, SKIP_TRAITS, TraitSpec, slug
 
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: JuwelCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(JuwelPresetSensor(coordinator, cid) for cid in coordinator.data)
+    entities: list[SensorEntity] = []
+
+    for cid, data in coordinator.data.items():
+        if data.get("is_light"):
+            entities.append(JuwelPresetSensor(coordinator, cid))
+
+        # Everything without a safe control becomes read-only, so nothing is lost
+        traits: dict[str, TraitSpec] = data.get("traits") or {}
+        for spec in traits.values():
+            if spec.trait in SKIP_TRAITS:
+                continue
+            if data.get("is_light") and spec.trait in LIGHT_TRAITS:
+                continue
+            if _has_control(spec, data):
+                continue
+            entities.append(JuwelTraitSensor(coordinator, cid, spec))
+
+    async_add_entities(entities)
+
+
+def _has_control(spec: TraitSpec, data: dict[str, Any]) -> bool:
+    """True if another platform already exposes this trait as a control."""
+    from .button import _enum_options
+    from .select import SELECT_TRAITS
+    from .switch import SWITCH_TRAITS
+    from .traits import T_FEED, T_TIMER_RESET
+
+    if spec.trait in (T_FEED, T_TIMER_RESET):
+        return True
+    if spec.trait in SELECT_TRAITS and spec.enum:
+        return True
+    if spec.trait in SWITCH_TRAITS and (spec.enum is not None or spec.is_boolean):
+        return True
+    if spec.numeric_property():
+        return True
+    return False
+
+
+class JuwelTraitSensor(JuwelEntity, SensorEntity):
+    """Read-only view of a trait we do not offer a control for (yet)."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self, coordinator: JuwelCoordinator, cloud_device_id: str, spec: TraitSpec
+    ) -> None:
+        super().__init__(coordinator, cloud_device_id)
+        self._spec = spec
+        self._attr_translation_key = slug(spec.trait)
+        self._attr_unique_id = f"{cloud_device_id}_{spec.msg_key}"
+
+    @property
+    def native_value(self) -> Any:
+        value = self._state.get(self._spec.msg_key)
+        if isinstance(value, dict):
+            # objects are shown through the attributes, keep the state short
+            if len(value) == 1:
+                return next(iter(value.values()))
+            return "ok" if value else None
+        if isinstance(value, bool):
+            return "on" if value else "off"
+        return value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        value = self._state.get(self._spec.msg_key)
+        if isinstance(value, dict):
+            return dict(value)
+        return {}
 
 
 class JuwelPresetSensor(JuwelEntity, SensorEntity):

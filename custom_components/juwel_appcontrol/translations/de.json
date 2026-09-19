@@ -20,17 +20,105 @@
     }
   },
   "entity": {
+    "button": {
+      "feed_now": {
+        "name": "Jetzt füttern"
+      },
+      "timer_reset_clean_pump": {
+        "name": "Zeitgeber Pumpenreinigung zurücksetzen"
+      },
+      "timer_reset_impeller": {
+        "name": "Zeitgeber Impeller zurücksetzen"
+      },
+      "timer_reset_all": {
+        "name": "Alle Zeitgeber zurücksetzen"
+      }
+    },
     "number": {
-      "white": { "name": "Weiß" },
-      "red": { "name": "Rot" },
-      "green": { "name": "Grün" },
-      "blue": { "name": "Blau" }
+      "white": {
+        "name": "Weiß"
+      },
+      "red": {
+        "name": "Rot"
+      },
+      "green": {
+        "name": "Grün"
+      },
+      "blue": {
+        "name": "Blau"
+      },
+      "feed_quantity": {
+        "name": "Futtermenge"
+      },
+      "feed_key_quantity": {
+        "name": "Futtermenge (Taste am Gerät)"
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Betriebsart"
+      }
     },
     "switch": {
-      "auto_mode": { "name": "Automatikmodus" }
+      "auto_mode": {
+        "name": "Automatikmodus"
+      },
+      "status": {
+        "name": "Ein/Aus"
+      },
+      "power": {
+        "name": "Ein/Aus"
+      },
+      "led_switch": {
+        "name": "Status-LED"
+      },
+      "smart_feed": {
+        "name": "Fütterungspause"
+      },
+      "power_limit": {
+        "name": "Leistungsgrenze"
+      }
     },
     "sensor": {
-      "preset": { "name": "Profil" }
+      "preset": {
+        "name": "Profil"
+      },
+      "speed": {
+        "name": "Drehzahl"
+      },
+      "speed_lph": {
+        "name": "Durchfluss"
+      },
+      "effect": {
+        "name": "Effekt"
+      },
+      "effect_intensity": {
+        "name": "Effektstärke"
+      },
+      "night_mode": {
+        "name": "Nachtmodus"
+      },
+      "power_profile": {
+        "name": "Leistungsprofil"
+      },
+      "temp_limits": {
+        "name": "Temperaturgrenzen"
+      },
+      "led_indicators": {
+        "name": "LED-Anzeigen"
+      },
+      "control": {
+        "name": "Steuerung"
+      },
+      "status": {
+        "name": "Status"
+      },
+      "feed": {
+        "name": "Fütterung"
+      },
+      "mode": {
+        "name": "Modus"
+      }
     }
   }
 }
