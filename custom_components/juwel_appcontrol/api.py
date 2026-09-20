@@ -107,6 +107,14 @@ class JuwelCloud:
             _LOGGER.debug("Futterplaene nicht abrufbar: %s", err)
             return []
 
+    async def set_feeder_presets(self, presets: list[dict[str, Any]]) -> Any:
+        """Futterplaene schreiben.
+
+        Die Cloud kennt nur einen Sammelschreibzugriff: die komplette Liste
+        wird ersetzt. Diese Liste ist von den Lichtprofilen getrennt.
+        """
+        return await self._request("POST", "/presets/feeder/set", json={"list": presets})
+
     async def get_product_config(self, product_id: str) -> dict[str, Any] | None:
         """Fähigkeitsbeschreibung eines Produkts (traits mit msg_key/Schema)."""
         try:
@@ -135,6 +143,16 @@ class JuwelCloud:
 
     async def _command(self, cloud_device_id: str, body: dict[str, Any]) -> Any:
         return await self._request("POST", f"/device/{cloud_device_id}/command", json=body)
+
+    async def set_preset_for_weekday(
+        self, cloud_device_id: str, slot: int, day_of_week: int
+    ) -> Any:
+        """Profil eines Wochentags setzen (dayOfWeek: 0 = Sonntag .. 6 = Samstag)."""
+        return await self._command(
+            cloud_device_id,
+            {"type": "preset", "action": "set", "id": int(slot),
+             "dayOfWeek": int(day_of_week)},
+        )
 
     async def pause_schedule(self, cloud_device_id: str) -> Any:
         """Zeitplan pausieren = Manuell-/Vorschaumodus aktivieren."""

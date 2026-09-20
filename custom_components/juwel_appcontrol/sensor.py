@@ -7,6 +7,9 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+import voluptuous as vol
+
+from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
@@ -47,6 +50,32 @@ async def async_setup_entry(
 
     async_add_entities(entities)
 
+    entity_platform.async_get_current_platform().async_register_entity_service(
+        "set_feeding_plan",
+        {
+            vol.Optional("weekdays"): vol.All(
+                cv.ensure_list, [vol.In(list(WEEKDAY_TO_NUMBER) + ["all"])]
+            ),
+            vol.Optional("feedings"): vol.All(
+                cv.ensure_list,
+                [vol.Schema({
+                    vol.Required("time"): cv.string,
+                    vol.Optional("amount", default=1): vol.All(
+                        vol.Coerce(int), vol.Range(min=1, max=8)
+                    ),
+                })],
+            ),
+        },
+        "async_set_feeding_plan",
+    )
+
+
+# commandInterval zaehlt wie die Geraetebefehle: 0 = Sonntag .. 6 = Samstag
+WEEKDAY_TO_NUMBER = {
+    "sunday": 0, "monday": 1, "tuesday": 2, "wednesday": 3,
+    "thursday": 4, "friday": 5, "saturday": 6,
+}
+
 
 def _has_control(spec: TraitSpec, data: dict[str, Any]) -> bool:
     """True if another platform already exposes this trait as a control."""
@@ -84,7 +113,53 @@ def _weekdays(raw: str) -> tuple[list[int], str]:
     return days, ", ".join(WEEKDAY_NAMES[d] for d in days)
 
 
-class JuwelFeedPlanSensor(JuwelEntity, SensorEntity):
+class _FeedPlanMixin:
+    """Schreiben des Futterplans - am Plan-Sensor angesiedelt."""
+
+    async def async_set_feeding_plan(
+        self, weekdays: list[str] | None = None,
+        feedings: list[dict[str, Any]] | None = None,
+    ) -> None:
+        plan = self._plan
+        if not plan:
+            raise ValueError("No feeding plan assigned to this feeder")
+
+        client = self.coordinator.client
+        presets = await client.get_feeder_presets()
+        target = next((p for p in presets if str(p.get("id")) == str(plan.get("id"))), None)
+        if target is None:
+            raise ValueError("Feeding plan not found in the cloud list")
+
+        if weekdays:
+            if "all" in weekdays:
+                days = "*"
+            else:
+                nums = sorted({WEEKDAY_TO_NUMBER[d] for d in weekdays})
+                days = ",".join(str(n) for n in nums)
+            target["commandInterval"] = f"* * {days};"
+
+        if feedings:
+            events = []
+            for i, item in enumerate(feedings):
+                hhmm = str(item["time"])[:5]
+                hours, _, minutes = hhmm.partition(":")
+                try:
+                    total = int(hours) * 60 + int(minutes)
+                except ValueError as err:
+                    raise ValueError(f"Invalid time {item['time']!r}, expected HH:MM") from err
+                events.append({
+                    "id": 200 + i,
+                    "time": total,
+                    "value": {"amount": int(item.get("amount", 1))},
+                })
+            events.sort(key=lambda e: e["time"])
+            target["timeEvents"] = events
+
+        await client.set_feeder_presets(presets)
+        await self.coordinator.async_request_refresh()
+
+
+class JuwelFeedPlanSensor(_FeedPlanMixin, JuwelEntity, SensorEntity):
     """The feeding plan assigned to this feeder.
 
     Structure verified on hardware:
@@ -252,6 +327,25 @@ class JuwelTraitSensor(JuwelEntity, SensorEntity):
         return {}
 
 
+# Vendor presets carry internal keys; the app shows product names for them.
+VENDOR_NAMES = {
+    "standard": "Standard",
+    "aquascape": "Aquascape",
+    "ohne_mittagpause": "Standard without midday break",
+    "malawi": "Malawi",
+    "amazonas": "Amazonas",
+    "amazons": "Amazonas",
+    "feeder_daily": "Feed daily",
+}
+
+
+def pretty_preset_name(name: str | None) -> str:
+    """Vendor key -> product name; user presets keep their own name."""
+    if not name:
+        return ""
+    return VENDOR_NAMES.get(str(name).lower(), str(name))
+
+
 class JuwelPresetSensor(JuwelEntity, SensorEntity):
     """Aktives Beleuchtungsprofil; liefert die Tageskurve als Attribut."""
 
@@ -270,7 +364,7 @@ class JuwelPresetSensor(JuwelEntity, SensorEntity):
     def native_value(self) -> str | None:
         preset = self._preset
         if preset:
-            return preset.get("name")
+            return pretty_preset_name(preset.get("name"))
         slot = self._state.get("active_preset")
         return f"Slot {slot}" if slot is not None else None
 
@@ -298,8 +392,58 @@ class JuwelPresetSensor(JuwelEntity, SensorEntity):
             "mode": self._state.get("mode"),
             "status": self._state.get("status"),
             "connected": self._state.get("connected"),
+            **self._weekly_plan(),
             # Geschwister-Entitäten, damit die Karte sie sprachunabhängig findet
             **self._related_entities(),
+        }
+
+    def _weekly_plan(self) -> dict[str, Any]:
+        """Welches Profil an welchem Wochentag laeuft.
+
+        `preset_id_by_weekday` enthaelt je Wochentag den Slot; die Slots sind
+        ueber `presetSlotInfo` den Profilen zugeordnet. Die Reihenfolge des
+        Arrays wird zusaetzlich gegen `active_preset` geprueft, damit eine
+        falsche Annahme sofort auffaellt statt still Unsinn zu liefern.
+        """
+        week = self._state.get("preset_id_by_weekday")
+        if not isinstance(week, list) or len(week) != 7:
+            return {}
+
+        info = self.coordinator.data.get(self._cid, {}).get("info") or {}
+        presets = self.coordinator.data.get(self._cid, {}).get("presets") or []
+        slot_to_id = {
+            e.get("slotId"): str(e.get("presetId"))
+            for e in info.get("presetSlotInfo") or []
+        }
+        id_to_name = {str(p.get("id")): p.get("name") for p in presets}
+
+        def name_of(slot: Any) -> str:
+            resolved = id_to_name.get(slot_to_id.get(slot, ""))
+            return pretty_preset_name(resolved) if resolved else f"Slot {slot}"
+
+        # Array beginnt mit Montag; Gegenprobe ueber den heutigen Tag
+        labels = ["monday", "tuesday", "wednesday", "thursday",
+                  "friday", "saturday", "sunday"]
+        today_index = dt_util.now().weekday()          # 0 = Montag
+        matches = week[today_index] == self._state.get("active_preset")
+
+        # Zur Fehlersuche: was die Cloud plant vs. was das Geraet meldet
+        cloud_timeline = {}
+        for entry in info.get("timeline") or []:
+            day = entry.get("dayOfWeek")
+            if day is None:
+                continue
+            resolved = id_to_name.get(str(entry.get("id")))
+            cloud_timeline[str(day)] = (
+                pretty_preset_name(resolved) if resolved else f"id {entry.get('id')}"
+            )
+
+        return {
+            "weekly_plan": {d: name_of(week[i]) for i, d in enumerate(labels)},
+            "weekly_plan_slots": week,
+            "weekly_plan_verified": matches,
+            "slot_info": {str(k): name_of(k) for k in sorted(slot_to_id)},
+            "cloud_timeline": cloud_timeline,
         }
 
     def _related_entities(self) -> dict[str, Any]:

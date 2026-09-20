@@ -57,6 +57,9 @@
     "select": {
       "mode": {
         "name": "Operating mode"
+      },
+      "preset": {
+        "name": "Profile (today)"
       }
     },
     "switch": {
@@ -135,6 +138,36 @@
       },
       "device_error": {
         "name": "Device error"
+      }
+    }
+  },
+  "services": {
+    "set_profile": {
+      "name": "Set lighting profile",
+      "description": "Assign a lighting profile to a weekday. The app can only change the current day; here you can pick any day or the whole week.",
+      "fields": {
+        "profile": {
+          "name": "Profile",
+          "description": "Profile name as shown by the 'Profile (today)' entity, e.g. Persönlich or Standard."
+        },
+        "weekday": {
+          "name": "Weekday",
+          "description": "Which day to assign it to. 'today' matches the app's activate button, 'all' sets the whole week (takes about a minute)."
+        }
+      }
+    },
+    "set_feeding_plan": {
+      "name": "Set feeding plan",
+      "description": "Change the feeding plan of a SmartFeed: feeding times with amounts and the weekdays it runs on.",
+      "fields": {
+        "weekdays": {
+          "name": "Weekdays",
+          "description": "Days the plan runs on. 'all' means every day. Leave empty to keep the current days."
+        },
+        "feedings": {
+          "name": "Feedings",
+          "description": "List of feedings, e.g. [{\"time\": \"08:00\", \"amount\": 2}]. Amount 1-8. Leave empty to keep the current times."
+        }
       }
     }
   }

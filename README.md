@@ -44,12 +44,13 @@ entities. New device types therefore show up on their own.
 - **Individual colour channels** W/R/G/B as percentage sliders
 - **Automatic schedule** on/off — manual changes pause it automatically
 - Active **lighting profile** including its full daily curve
+- **Weekly plan:** a profile per weekday, editable right in the card
 
 ### 🐟 Feeder (SmartFeed)
 - **Feed now** button, feed quantity, quantity for the button on the device
 - Status LED switch, power
 - **Feed chamber empty** and device-error warnings, auger state, last feeding
-- **Feeding plan** with times, amounts and weekdays
+- **Feeding plan** with times, amounts and weekdays — editable right in the card
 
 ### 🌊 Pump (EccoFlow)
 - Power, operating mode, smart-feed pause, power limit
@@ -59,6 +60,8 @@ entities. New device types therefore show up on their own.
 ### 📊 Dashboard cards
 - **Daily curve** of the active profile (W/R/G/B over 24 h) with a "now" marker
 - Profile row, manual-mode switch and four colour sliders
+- **Weekly plan** as a collapsible section: one profile per weekday, or apply one
+  to the whole week
 - **Two layouts:** full or compact (single row)
 - **Two designs:** MyJUWEL look or your global Home Assistant theme
 - **Pop-up:** the compact card opens the full one — either as its own dialog or
@@ -67,9 +70,10 @@ entities. New device types therefore show up on their own.
 - **Ships with the integration** and is registered automatically — no manual
   resource entry needed
 
-There is a second card for the **SmartFeed**: feeding plan with times and weekdays,
-a large *Feed now* button (disabled while the auger runs), quantity slider, status
-LED, chamber state and last feeding. Same two layouts, same two designs.
+There is a second card for the **SmartFeed**: a large *Feed now* button (disabled
+while the auger runs), quantity stepper, status LED, chamber state and last feeding
+— plus a collapsible **feeding planner**: pick the weekdays, set each feeding time
+and amount, add or remove feedings, then save. Same two layouts, same two designs.
 
 English and German are included; the cards follow your Home Assistant language.
 
@@ -147,6 +151,7 @@ Everything is available in the visual editor:
 | `layout` | `full` \| `compact` | Full card or a single row |
 | `design` | `juwel` \| `ha` | MyJUWEL look or your Home Assistant theme |
 | `show_chart` | true/false | Daily curve (only with `full`) |
+| `show_week` | true/false | Weekly plan section |
 | `tap_action` | `popup` \| `more-info` \| `hash` \| `none` | What happens on tap |
 | `popup_hash` | e.g. `#aquarium` | Target hash for `tap_action: hash` (Bubble Card) |
 
@@ -166,6 +171,7 @@ tap_action: popup
 | `name` | text | Custom heading |
 | `layout` | `full` \| `compact` | Full card or a single row |
 | `design` | `juwel` \| `ha` | MyJUWEL look or your Home Assistant theme |
+| `show_plan` | true/false | Feeding planner section |
 | `tap_action` | `popup` \| `more-info` \| `none` | What happens on tap |
 
 ```yaml
@@ -173,6 +179,58 @@ type: custom:juwel-feeder-card
 plan_sensor: sensor.my_feeder_feeding_plan
 design: ha
 ```
+
+---
+
+## Actions
+
+Both are also available from the cards, so you only need them for automations.
+
+### `juwel_appcontrol.set_profile`
+
+Assign a lighting profile to a weekday. Target a `select` entity of this integration.
+
+| Field | Values | Meaning |
+|---|---|---|
+| `profile` | text | Profile name as shown by the *Profile (today)* entity |
+| `weekday` | `today` \| `all` \| `monday` … `sunday` | Which day to assign it to |
+
+```yaml
+action: juwel_appcontrol.set_profile
+target:
+  entity_id: select.my_aquarium_profile_today
+data:
+  profile: Standard
+  weekday: saturday
+```
+
+> The MyJUWEL app can only change the current day. Here you can pick any day, or
+> the whole week — `all` walks through the seven days and takes about a minute.
+
+### `juwel_appcontrol.set_feeding_plan`
+
+Change a SmartFeed's feeding plan. Target the feeding-plan `sensor`.
+
+| Field | Values | Meaning |
+|---|---|---|
+| `weekdays` | list of `all` \| `monday` … `sunday` | Days the plan runs on; omit to keep them |
+| `feedings` | list of `{time, amount}` | Times (`HH:MM`) and amounts (1–8); omit to keep them |
+
+```yaml
+action: juwel_appcontrol.set_feeding_plan
+target:
+  entity_id: sensor.my_feeder_feeding_plan
+data:
+  weekdays: [monday, thursday, saturday]
+  feedings:
+    - time: "08:00"
+      amount: 2
+    - time: "18:00"
+      amount: 1
+```
+
+> This replaces the whole feeding plan, which is how the cloud API works — there is
+> no way to change a single entry. Fields you leave out keep their current value.
 
 ---
 
@@ -184,6 +242,9 @@ design: ha
   affiliation with JUWEL Aquarium GmbH & Co. KG.
 - Tested with **HeliaLux AppControl** (firmware V2.0.1.3) and **SmartFeed
   AppControl** (firmware V2.0.1.58) on Home Assistant 2026.9.
+- The **feeding planner is not yet verified on hardware.** Reading the plan is, and
+  the write goes to the feeder's own preset list only — it cannot touch your
+  lighting profiles. Feedback welcome.
 - The manufacturer's product catalogue declares some values as objects where the
   devices actually use plain numbers. The integration mirrors whatever the device
   reports instead of trusting the schema — verified on both devices.

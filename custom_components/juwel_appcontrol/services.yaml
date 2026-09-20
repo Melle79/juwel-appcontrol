@@ -1,0 +1,52 @@
+set_profile:
+  target:
+    entity:
+      integration: juwel_appcontrol
+      domain: select
+  fields:
+    profile:
+      required: true
+      example: "Persönlich"
+      selector:
+        text:
+    weekday:
+      required: false
+      default: today
+      selector:
+        select:
+          options:
+            - today
+            - all
+            - monday
+            - tuesday
+            - wednesday
+            - thursday
+            - friday
+            - saturday
+            - sunday
+
+set_feeding_plan:
+  target:
+    entity:
+      integration: juwel_appcontrol
+      domain: sensor
+  fields:
+    weekdays:
+      required: false
+      selector:
+        select:
+          multiple: true
+          options:
+            - all
+            - monday
+            - tuesday
+            - wednesday
+            - thursday
+            - friday
+            - saturday
+            - sunday
+    feedings:
+      required: false
+      example: '[{"time": "08:00", "amount": 2}, {"time": "18:00", "amount": 1}]'
+      selector:
+        object:

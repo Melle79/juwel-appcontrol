@@ -1,5 +1,5 @@
 /*
- * Juwel HeliaLux Card  v2.0.0
+ * Juwel AppControl Cards  v2.5.0
  * Lovelace card for the "juwel_appcontrol" integration.
  *
  * Options (all available in the visual editor):
@@ -31,11 +31,16 @@ const I18N = {
     oJuwel: "MyJUWEL look (dark blue)", oHa: "Follow Home Assistant theme",
     oPopup: "Open the full card as a pop-up", oMore: "Show more-info dialog",
     oHash: "Open a Bubble Card pop-up by hash", oNone: "Do nothing",
+    week: "Weekly plan", applyAll: "Apply to all days", fWeek: "Show weekly plan",
+    days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     plan: "Plan", feedNow: "Feed now", feeding: "Feeding…",
     quantity: "Quantity", statusLed: "Status LED",
     chamber: "Feed chamber", chamberEmpty: "Empty", chamberOk: "Filled",
     motor: "Auger", lastFeed: "Last feeding", never: "never",
     noPlan: "no plan", amount: "amount", fFeeder: "Feeder (Juwel AppControl)",
+    feedPlan: "Feeding plan", addFeeding: "Add feeding", save: "Save plan",
+    saving: "Saving…", removeFeeding: "Remove", everyDay: "every day",
+    fPlan: "Show feeding plan", pickDay: "Pick at least one day",
   },
   de: {
     status: "Status", online: "Online", offline: "Offline",
@@ -49,11 +54,16 @@ const I18N = {
     oJuwel: "MyJUWEL-Look (dunkelblau)", oHa: "Home-Assistant-Theme übernehmen",
     oPopup: "Große Karte als Popup öffnen", oMore: "Detailansicht (more-info)",
     oHash: "Bubble-Card-Popup per Hash öffnen", oNone: "Nichts tun",
+    week: "Wochenplan", applyAll: "Für alle Tage übernehmen", fWeek: "Wochenplan anzeigen",
+    days: ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"],
     plan: "Plan", feedNow: "Jetzt füttern", feeding: "Füttert…",
     quantity: "Menge", statusLed: "Status-LED",
     chamber: "Futterkammer", chamberEmpty: "Leer", chamberOk: "Gefüllt",
     motor: "Futterschnecke", lastFeed: "Letzte Fütterung", never: "nie",
     noPlan: "kein Plan", amount: "Menge", fFeeder: "Futterautomat (Juwel AppControl)",
+    feedPlan: "Futterplan", addFeeding: "Fütterung hinzufügen", save: "Plan speichern",
+    saving: "Speichert…", removeFeeding: "Entfernen", everyDay: "täglich",
+    fPlan: "Futterplan anzeigen", pickDay: "Mindestens ein Tag muss bleiben",
   },
 };
 
@@ -92,6 +102,7 @@ class JuwelHelialuxCard extends HTMLElement {
     };
     this._lightId = config.light || config.entity;
     this._built = false;
+    if (this._weekOpen === undefined) this._weekOpen = false;
   }
 
   getCardSize() {
@@ -135,6 +146,12 @@ class JuwelHelialuxCard extends HTMLElement {
     this._ids.auto =
       c.auto_switch || sa.auto_switch_entity ||
       siblings.find((e) => e.startsWith("switch."));
+
+    // Profil-Auswahl: bevorzugt aus den Sensor-Attributen, sonst ueber das
+    // Geraet. Beim Start kann der Sensor sie noch nicht kennen.
+    this._ids.profileSelect =
+      c.profile_select || sa.profile_select_entity ||
+      siblings.find((e) => e.startsWith("select."));
 
     CH.forEach((ch) => {
       this._ids[ch.key] =
@@ -216,6 +233,33 @@ class JuwelHelialuxCard extends HTMLElement {
         .val{width:52px;text-align:right;font-variant-numeric:tabular-nums}
         .disabled{opacity:.45;pointer-events:none}
         .hint{font-size:.78rem;color:var(--jh-sub);opacity:.8;margin:8px 2px 0}
+        .week{margin-top:16px;border-top:1px solid var(--jh-grid);padding-top:6px}
+        .week > summary{
+          list-style:none;cursor:pointer;padding:8px 2px;font-size:.92rem;
+          font-weight:600;color:var(--jh-sub);display:flex;align-items:center;gap:8px;
+        }
+        .week > summary::-webkit-details-marker{display:none}
+        .week > summary::before{
+          content:"";width:0;height:0;flex:0 0 auto;
+          border-left:6px solid currentColor;border-top:4px solid transparent;
+          border-bottom:4px solid transparent;transition:transform .15s;
+        }
+        .week[open] > summary::before{transform:rotate(90deg)}
+        .week .sub{margin-left:auto;font-weight:400;opacity:.8}
+        .wrow{display:flex;align-items:center;gap:10px;margin:7px 0}
+        .wday{width:34px;color:var(--jh-sub);font-weight:600}
+        .wday.today{color:var(--jh-fg)}
+        .wsel{
+          flex:1;padding:9px 10px;border-radius:12px;border:1px solid var(--jh-grid);
+          background:var(--jh-row);color:var(--jh-fg);font-family:inherit;
+          font-size:.95rem;appearance:none;cursor:pointer;
+        }
+        .wall{
+          width:100%;margin-top:10px;padding:11px;border:1px solid var(--jh-grid);
+          border-radius:12px;background:transparent;color:var(--jh-sub);
+          font-family:inherit;font-size:.9rem;cursor:pointer;
+        }
+        .wall:active{filter:brightness(1.3)}
         .err{padding:16px;color:#ff8a8a}
 
         /* --- kompakte Variante --- */
@@ -300,7 +344,8 @@ class JuwelHelialuxCard extends HTMLElement {
       <div class="sliders ${isAuto ? "disabled" : ""}">
         ${CH.map((ch) => this._sliderHtml(ch)).join("")}
       </div>
-      ${isAuto ? `<div class="hint">${T.autoHint}</div>` : ""}`;
+      ${isAuto ? `<div class="hint">${T.autoHint}</div>` : ""}
+      ${this._config.show_week === false ? "" : this._weekHtml(T, attrs)}`;
 
     this._wire();
   }
@@ -369,6 +414,40 @@ class JuwelHelialuxCard extends HTMLElement {
     this._dialog = dlg;
     this._popupCard = card;
     dlg.open = true;
+  }
+
+  /* Wochenplan: je Tag ein Auswahlfeld */
+  _weekHtml(T, attrs) {
+    const plan = attrs.weekly_plan;
+    const slots = attrs.slot_info;
+    if (!plan || !slots || !this._ids.profileSelect) return "";
+    const options = Object.values(slots);
+    const todayIdx = (new Date().getDay() + 6) % 7;      // 0 = Montag
+    const keys = ["monday", "tuesday", "wednesday", "thursday",
+                  "friday", "saturday", "sunday"];
+    const rows = keys.map((k, i) => {
+      const cur = plan[k];
+      const opts = options
+        .map((o) => `<option${o === cur ? " selected" : ""}>${o}</option>`)
+        .join("");
+      return `<div class="wrow">
+                <div class="wday${i === todayIdx ? " today" : ""}">${T.days[i]}</div>
+                <select class="wsel" data-day="${k}">${opts}</select>
+              </div>`;
+    }).join("");
+    // Zusammenfassung fuer den eingeklappten Zustand: abweichende Tage zeigen
+    const values = keys.map((k) => plan[k]);
+    const uniq = [...new Set(values)];
+    const summary = uniq.length === 1
+      ? uniq[0]
+      : keys.map((k, i) => `${T.days[i]} ${plan[k]}`).filter((_, i) =>
+          values[i] !== values[(i + 6) % 7]).join(" · ");
+
+    return `<details class="week"${this._weekOpen ? " open" : ""} id="weekbox">
+              <summary>${T.week}<span class="sub">${summary}</span></summary>
+              ${rows}
+              <button class="wall" id="weekall">${T.applyAll}</button>
+            </details>`;
   }
 
   _sliderHtml(ch) {
@@ -446,6 +525,37 @@ class JuwelHelialuxCard extends HTMLElement {
         const isAuto = this._hass.states[sw].state === "on";
         this._hass.callService("switch", isAuto ? "turn_off" : "turn_on", { entity_id: sw });
       };
+    }
+
+    const weekBox = this.shadowRoot.getElementById("weekbox");
+    if (weekBox) {
+      // offen/zu ueber Neu-Aufbauten hinweg behalten
+      weekBox.ontoggle = () => { this._weekOpen = weekBox.open; };
+    }
+
+    const selectEntity = this._ids.profileSelect;
+    if (selectEntity) {
+      this.shadowRoot.querySelectorAll(".wsel").forEach((sel) => {
+        sel.onchange = () => {
+          this._hass.callService("juwel_appcontrol", "set_profile", {
+            entity_id: selectEntity,
+            profile: sel.value,
+            weekday: sel.dataset.day,
+          });
+        };
+      });
+      const all = this.shadowRoot.getElementById("weekall");
+      if (all) {
+        all.onclick = () => {
+          const first = this.shadowRoot.querySelector(".wsel");
+          if (!first) return;
+          this._hass.callService("juwel_appcontrol", "set_profile", {
+            entity_id: selectEntity,
+            profile: first.value,
+            weekday: "all",
+          });
+        };
+      }
     }
 
     this.shadowRoot.querySelectorAll(".track").forEach((tr) => {
@@ -537,7 +647,10 @@ class JuwelHelialuxCardEditor extends HTMLElement {
           },
         },
       },
-      ...(compact ? [] : [{ name: "show_chart", selector: { boolean: {} } }]),
+      ...(compact ? [] : [
+        { name: "show_chart", selector: { boolean: {} } },
+        { name: "show_week", selector: { boolean: {} } },
+      ]),
       {
         name: "tap_action",
         selector: {
@@ -563,6 +676,7 @@ class JuwelHelialuxCardEditor extends HTMLElement {
         layout: T.fLayout,
         design: T.fDesign,
         show_chart: T.fChart,
+        show_week: T.fWeek,
         tap_action: T.fTap,
         popup_hash: T.fHash,
       }[s.name] || s.name);
@@ -700,6 +814,17 @@ class JuwelFeederCard extends HTMLElement {
         .grip{position:absolute;top:50%;width:24px;height:24px;border-radius:50%;
               background:#fff;transform:translate(-50%,-50%);box-shadow:0 1px 4px rgba(0,0,0,.45)}
         .val{width:28px;text-align:right;font-variant-numeric:tabular-nums}
+        .step{display:flex;align-items:center;gap:12px;margin:16px 2px 4px}
+        .step .lab{color:var(--jh-sub);flex:1}
+        .stepbtn{
+          width:44px;height:44px;border:0;border-radius:14px;cursor:pointer;
+          background:var(--jh-row);color:var(--jh-fg);font-size:1.5rem;
+          line-height:1;font-family:inherit;flex:0 0 auto;
+        }
+        .stepbtn:active{filter:brightness(1.25)}
+        .stepbtn[disabled]{opacity:.35;cursor:default}
+        .stepval{min-width:34px;text-align:center;font-size:1.15rem;font-weight:600;
+                 font-variant-numeric:tabular-nums}
         .toggle-row{display:flex;align-items:center;gap:14px;margin:14px 2px 2px}
         .sw{width:52px;height:28px;border-radius:14px;background:var(--jh-swoff);
             position:relative;cursor:pointer;flex:0 0 auto;border:1px solid var(--jh-grid)}
@@ -714,13 +839,61 @@ class JuwelFeederCard extends HTMLElement {
         .c-vals{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:.95rem}
         .c-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .err{padding:16px;color:#ff8a8a}
+        .week{margin-top:16px;border-top:1px solid var(--jh-grid);padding-top:6px}
+        .week > summary{
+          list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;
+          font-weight:600;padding:6px 2px;
+        }
+        .week > summary::-webkit-details-marker{display:none}
+        .week > summary::before{
+          content:"";width:0;height:0;border-left:6px solid currentColor;
+          border-top:4px solid transparent;border-bottom:4px solid transparent;
+          transition:transform .15s;flex:0 0 auto;
+        }
+        .week[open] > summary::before{transform:rotate(90deg)}
+        .week .sub{margin-left:auto;font-weight:400;opacity:.8;font-size:.85rem;
+                   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .chips{display:flex;gap:6px;margin:8px 0 12px;flex-wrap:wrap}
+        .chip{
+          flex:1 1 0;min-width:38px;padding:9px 0;border:1px solid var(--jh-grid);
+          border-radius:12px;background:transparent;color:var(--jh-sub);
+          font-family:inherit;font-size:.9rem;cursor:pointer;
+        }
+        .chip.on{background:var(--jh-accent);border-color:var(--jh-accent);
+                 color:#fff;font-weight:600}
+        .frow{display:flex;align-items:center;gap:8px;margin:8px 0}
+        .ftime{
+          flex:1;min-width:0;padding:10px;border-radius:12px;border:1px solid var(--jh-grid);
+          background:var(--jh-row);color:var(--jh-fg);font-family:inherit;
+          font-size:1rem;font-variant-numeric:tabular-nums;
+        }
+        .stepbtn.sm{width:38px;height:38px;border-radius:12px;font-size:1.25rem}
+        .stepval.sm{min-width:22px;font-size:1rem}
+        .del{
+          width:34px;height:38px;border:0;border-radius:12px;background:transparent;
+          color:var(--jh-sub);font-size:1.3rem;line-height:1;cursor:pointer;
+          font-family:inherit;flex:0 0 auto;
+        }
+        .del:hover{color:#ff6b6b}
+        .del[disabled]{opacity:.3;cursor:default}
+        .wall{
+          width:100%;margin-top:10px;padding:11px;border:0;border-radius:14px;
+          background:var(--jh-accent);color:#fff;font-size:.95rem;font-weight:600;
+          cursor:pointer;font-family:inherit;
+        }
+        .wall:active{filter:brightness(1.15)}
+        .wall[disabled]{opacity:.45;cursor:default}
+        .wall.ghost{background:var(--jh-row);color:var(--jh-fg);font-weight:500}
       </style>
       <ha-card><div id="body"></div></ha-card>`;
     this._built = true;
   }
 
-  _render() {
+  _render(force) {
     if (!this._hass || !this._config) return;
+    // Waehrend einer Bearbeitung nicht neu zeichnen: sonst verloere der
+    // Entwurf beim naechsten Abruf der Cloud seinen Zwischenstand.
+    if ((this._dirty || this._saving) && !force) return;
     if (!this._built) this._build();
     this.setAttribute("data-design", this._config.design === "ha" ? "ha" : "juwel");
     const T = t(this._hass);
@@ -765,6 +938,7 @@ class JuwelFeederCard extends HTMLElement {
     const times = (a.feedings || [])
       .map((f) => `${f.time} · ${T.amount} ${f.amount}`)
       .join("   •   ");
+    const planner = this._config.show_plan === false ? "" : this._planHtml(T, a);
 
     body.innerHTML = `
       <div class="head">
@@ -784,6 +958,8 @@ class JuwelFeederCard extends HTMLElement {
         ${times ? `<div class="times">${times}${a.weekdays_text ? "   •   " + a.weekdays_text : ""}</div>` : ""}
       </div>
 
+      ${planner}
+
       <button class="feed" id="feed" ${busy || !ids.feed ? "disabled" : ""}>
         ${busy ? T.feeding : T.feedNow}
       </button>
@@ -799,22 +975,178 @@ class JuwelFeederCard extends HTMLElement {
       </div>`;
 
     this._wire(ids);
+    this._wirePlan(T, ids);
+  }
+
+  /* ---------- Wochenplaner ---------- */
+  // commandInterval zaehlt 0 = Sonntag; die Anzeige beginnt bei Montag.
+  static get DAY_KEYS() {
+    return ["sunday", "monday", "tuesday", "wednesday",
+            "thursday", "friday", "saturday"];
+  }
+  static get DAY_ORDER() {
+    return ["monday", "tuesday", "wednesday", "thursday",
+            "friday", "saturday", "sunday"];
+  }
+
+  _draftFrom(a) {
+    const K = JuwelFeederCard.DAY_KEYS;
+    return {
+      days: (a.weekdays || []).map((n) => K[n]).filter(Boolean),
+      feedings: (a.feedings || [])
+        .map((f) => ({ time: String(f.time || "00:00").slice(0, 5),
+                       amount: Math.max(1, Math.min(8, Number(f.amount) || 1)) }))
+        .sort((x, y) => x.time.localeCompare(y.time)),
+    };
+  }
+
+  _draftOf(a) {
+    if (!this._draft) this._draft = this._draftFrom(a);
+    return this._draft;
+  }
+
+  _planHtml(T, a) {
+    if (!a.feedings && !a.weekdays) return "";
+    const d = this._draft || this._draftFrom(a);
+    const ORDER = JuwelFeederCard.DAY_ORDER;
+
+    const chips = ORDER.map((k, i) =>
+      `<button class="chip${d.days.includes(k) ? " on" : ""}" data-day="${k}">${T.days[i]}</button>`
+    ).join("");
+
+    const rows = d.feedings.map((f, i) => `
+      <div class="frow">
+        <input class="ftime" type="time" value="${f.time}" data-i="${i}">
+        <button class="stepbtn sm" data-dec="${i}" ${f.amount <= 1 ? "disabled" : ""}>−</button>
+        <div class="stepval sm">${f.amount}</div>
+        <button class="stepbtn sm" data-inc="${i}" ${f.amount >= 8 ? "disabled" : ""}>+</button>
+        <button class="del" data-del="${i}" title="${T.removeFeeding}"
+                ${d.feedings.length <= 1 ? "disabled" : ""}>×</button>
+      </div>`).join("");
+
+    const dayTxt = d.days.length === 7 ? T.everyDay
+      : ORDER.filter((k) => d.days.includes(k))
+             .map((k) => T.days[ORDER.indexOf(k)]).join(", ");
+    const timeTxt = d.feedings.map((f) => f.time).join(", ");
+    const summary = this._dirty ? "" : `${dayTxt}${timeTxt ? "  ·  " + timeTxt : ""}`;
+
+    return `<details class="week"${this._planOpen ? " open" : ""} id="planbox">
+              <summary>${T.feedPlan}<span class="sub">${summary}</span></summary>
+              <div class="chips">${chips}</div>
+              ${rows}
+              <button class="wall ghost" id="addfeed"
+                      ${d.feedings.length >= 8 ? "disabled" : ""}>+ ${T.addFeeding}</button>
+              <button class="wall" id="saveplan" ${this._dirty ? "" : "disabled"}>
+                ${this._saving ? T.saving : T.save}</button>
+            </details>`;
+  }
+
+  _wirePlan(T, ids) {
+    const box = this.shadowRoot.getElementById("planbox");
+    if (!box) return;
+    box.addEventListener("toggle", () => { this._planOpen = box.open; });
+    const attrs = () => ((this._st(ids.plan) || {}).attributes || {});
+    const touch = () => { this._dirty = true; this._render(true); };
+
+    box.querySelectorAll(".chip").forEach((c) => {
+      c.onclick = (e) => {
+        e.preventDefault();
+        const d = this._draftOf(attrs());
+        const i = d.days.indexOf(c.dataset.day);
+        if (i >= 0) {
+          if (d.days.length <= 1) { c.title = T.pickDay; return; }
+          d.days.splice(i, 1);
+        } else {
+          d.days.push(c.dataset.day);
+        }
+        touch();
+      };
+    });
+
+    box.querySelectorAll(".ftime").forEach((inp) => {
+      // Ohne Neuzeichnen: sonst verliert das Zeitfeld mitten in der
+      // Eingabe den Fokus und der Tastenblock springt zu.
+      inp.onchange = () => {
+        const d = this._draftOf(attrs());
+        d.feedings[Number(inp.dataset.i)].time = inp.value || "00:00";
+        this._dirty = true;
+        const save = this.shadowRoot.getElementById("saveplan");
+        if (save) save.disabled = false;
+      };
+    });
+
+    box.querySelectorAll("[data-inc],[data-dec]").forEach((b) => {
+      b.onclick = (e) => {
+        e.preventDefault();
+        const d = this._draftOf(attrs());
+        const inc = b.dataset.inc !== undefined;
+        const f = d.feedings[Number(inc ? b.dataset.inc : b.dataset.dec)];
+        f.amount = Math.max(1, Math.min(8, f.amount + (inc ? 1 : -1)));
+        touch();
+      };
+    });
+
+    box.querySelectorAll("[data-del]").forEach((b) => {
+      b.onclick = (e) => {
+        e.preventDefault();
+        const d = this._draftOf(attrs());
+        if (d.feedings.length <= 1) return;
+        d.feedings.splice(Number(b.dataset.del), 1);
+        touch();
+      };
+    });
+
+    const add = this.shadowRoot.getElementById("addfeed");
+    if (add) add.onclick = (e) => {
+      e.preventDefault();
+      const d = this._draftOf(attrs());
+      if (d.feedings.length >= 8) return;
+      d.feedings.push({ time: "12:00", amount: 1 });
+      d.feedings.sort((x, y) => x.time.localeCompare(y.time));
+      touch();
+    };
+
+    const save = this.shadowRoot.getElementById("saveplan");
+    if (save) save.onclick = async (e) => {
+      e.preventDefault();
+      const d = this._draft;
+      if (!d || !d.days.length) return;
+      this._saving = true;
+      save.disabled = true;
+      save.textContent = T.saving;
+      try {
+        await this._hass.callService("juwel_appcontrol", "set_feeding_plan", {
+          entity_id: ids.plan,
+          weekdays: d.days.length === 7 ? ["all"] : d.days,
+          feedings: d.feedings.map((f) => ({ time: f.time, amount: f.amount })),
+        });
+      } catch (err) {
+        this._saving = false;
+        save.disabled = false;
+        save.textContent = String((err && err.message) || err).slice(0, 80);
+        return;
+      }
+      this._draft = null;
+      this._dirty = false;
+      this._saving = false;
+      this._planOpen = box.open;
+      this._render(true);
+    };
   }
 
   _slider(T, entityId) {
+    // Plus/Minus statt Schieberegler: auf Tablets deutlich treffsicherer,
+    // und bei acht Stufen ohnehin die passendere Bedienung.
     const st = this._st(entityId);
     const min = (st && st.attributes.min) || 1;
     const max = (st && st.attributes.max) || 8;
     const val = st ? Number(st.state) : min;
-    const pct = ((val - min) / Math.max(1, max - min)) * 100;
     return `
-      <div class="sl">
+      <div class="step">
         <div class="lab">${T.quantity}</div>
-        <div class="track" id="qty" data-min="${min}" data-max="${max}">
-          <div class="fill" style="width:${pct}%"></div>
-          <div class="grip" style="left:${pct}%"></div>
-        </div>
-        <div class="val" id="qtyval">${val}</div>
+        <button class="stepbtn" id="qtyminus" ${val <= min ? "disabled" : ""}>−</button>
+        <div class="stepval" id="qtyval">${val}</div>
+        <button class="stepbtn" id="qtyplus" ${val >= max ? "disabled" : ""}>+</button>
       </div>`;
   }
 
@@ -844,29 +1176,23 @@ class JuwelFeederCard extends HTMLElement {
       };
     }
 
-    const track = this.shadowRoot.getElementById("qty");
-    if (track && ids.qty) {
-      const min = Number(track.dataset.min), max = Number(track.dataset.max);
-      const apply = (ev) => {
-        const r = track.getBoundingClientRect();
-        const x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
-        const frac = Math.max(0, Math.min(1, x / r.width));
-        const v = Math.round(min + frac * (max - min));
-        const pct = ((v - min) / Math.max(1, max - min)) * 100;
-        track.querySelector(".fill").style.width = pct + "%";
-        track.querySelector(".grip").style.left = pct + "%";
+    if (ids.qty) {
+      const st = this._st(ids.qty);
+      const min = (st && st.attributes.min) || 1;
+      const max = (st && st.attributes.max) || 8;
+      const step = (delta) => {
+        const cur = Number((this._st(ids.qty) || {}).state) || min;
+        const next = Math.max(min, Math.min(max, cur + delta));
+        if (next === cur) return;
         const lbl = this.shadowRoot.getElementById("qtyval");
-        if (lbl) lbl.textContent = v;
-        return v;
-      };
-      track.onpointerdown = (e) => { track.setPointerCapture(e.pointerId); this._drag = true; apply(e); };
-      track.onpointermove = (e) => { if (this._drag) apply(e); };
-      track.onpointerup = (e) => {
-        if (!this._drag) return;
-        this._drag = false;
+        if (lbl) lbl.textContent = next;   // sofortige Rueckmeldung
         this._hass.callService("number", "set_value",
-          { entity_id: ids.qty, value: apply(e) });
+          { entity_id: ids.qty, value: next });
       };
+      const minus = this.shadowRoot.getElementById("qtyminus");
+      const plus = this.shadowRoot.getElementById("qtyplus");
+      if (minus) minus.onclick = () => step(-1);
+      if (plus) plus.onclick = () => step(1);
     }
   }
 
@@ -899,7 +1225,8 @@ class JuwelFeederCard extends HTMLElement {
 
 class JuwelFeederCardEditor extends HTMLElement {
   setConfig(config) {
-    this._config = { design: "juwel", layout: "full", tap_action: "popup", ...config };
+    this._config = { design: "juwel", layout: "full", tap_action: "popup",
+                     show_plan: true, ...config };
     this._render();
   }
   set hass(hass) { this._hass = hass; this._render(); }
@@ -925,13 +1252,14 @@ class JuwelFeederCardEditor extends HTMLElement {
           { value: "full", label: T.oFull }, { value: "compact", label: T.oCompact }] } } },
       { name: "design", selector: { select: { mode: "dropdown", options: [
           { value: "juwel", label: T.oJuwel }, { value: "ha", label: T.oHa }] } } },
+      { name: "show_plan", selector: { boolean: {} } },
       { name: "tap_action", selector: { select: { mode: "dropdown", options: [
           { value: "popup", label: T.oPopup }, { value: "more-info", label: T.oMore },
           { value: "none", label: T.oNone }] } } },
     ];
     this._form.computeLabel = (s) => ({
       plan_sensor: T.fFeeder, name: T.fName, layout: T.fLayout,
-      design: T.fDesign, tap_action: T.fTap,
+      design: T.fDesign, show_plan: T.fPlan, tap_action: T.fTap,
     }[s.name] || s.name);
   }
 }

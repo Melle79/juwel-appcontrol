@@ -9,6 +9,7 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import JuwelCloud
@@ -104,9 +105,20 @@ async def _async_sync_lovelace_resource(
         _LOGGER.debug("Karten-Ressource nicht setzbar", exc_info=True)
 
 
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Karte so frueh wie moeglich bereitstellen.
+
+    Laeuft beim Laden der Komponente, also vor dem Anmelden an der Cloud.
+    Sonst ist die Kartendatei beim Start noch nicht ausgeliefert und
+    Dashboards zeigen bis zum naechsten Neuladen einen Konfigurationsfehler.
+    """
+    await _async_register_card(hass)
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Integration aus einem Config-Entry einrichten."""
-    await _async_register_card(hass)
+    await _async_register_card(hass)   # Rückfall, falls async_setup uebersprungen wurde
 
     session = async_get_clientsession(hass)
     client = JuwelCloud(session, entry.data[CONF_EMAIL], entry.data[CONF_PASSWORD])

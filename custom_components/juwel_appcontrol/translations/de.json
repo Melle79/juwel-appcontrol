@@ -57,6 +57,9 @@
     "select": {
       "mode": {
         "name": "Betriebsart"
+      },
+      "preset": {
+        "name": "Profil (heute)"
       }
     },
     "switch": {
@@ -135,6 +138,36 @@
       },
       "device_error": {
         "name": "Gerätefehler"
+      }
+    }
+  },
+  "services": {
+    "set_profile": {
+      "name": "Lichtprofil setzen",
+      "description": "Weist einem Wochentag ein Lichtprofil zu. Die App kann nur den heutigen Tag ändern; hier lässt sich jeder Tag oder die ganze Woche wählen.",
+      "fields": {
+        "profile": {
+          "name": "Profil",
+          "description": "Profilname, wie ihn die Entität „Profil (heute)“ anzeigt, z. B. Persönlich oder Standard."
+        },
+        "weekday": {
+          "name": "Wochentag",
+          "description": "Welchem Tag es zugewiesen wird. „today“ entspricht dem Aktivieren-Knopf der App, „all“ setzt die ganze Woche (dauert etwa eine Minute)."
+        }
+      }
+    },
+    "set_feeding_plan": {
+      "name": "Futterplan setzen",
+      "description": "Den Futterplan eines SmartFeed ändern: Fütterungszeiten mit Menge und die Wochentage, an denen gefüttert wird.",
+      "fields": {
+        "weekdays": {
+          "name": "Wochentage",
+          "description": "Tage, an denen der Plan läuft. „all“ bedeutet täglich. Leer lassen, um die bisherigen Tage zu behalten."
+        },
+        "feedings": {
+          "name": "Fütterungen",
+          "description": "Liste der Fütterungen, z. B. [{\"time\": \"08:00\", \"amount\": 2}]. Menge 1–8. Leer lassen, um die bisherigen Zeiten zu behalten."
+        }
       }
     }
   }

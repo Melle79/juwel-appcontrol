@@ -4,6 +4,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from homeassistant.core import callback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.device_registry import (
     CONNECTION_NETWORK_MAC,
@@ -52,7 +53,10 @@ class JuwelEntity(CoordinatorEntity[JuwelCoordinator]):
         self._pending_until = time.monotonic() + self.PENDING_TTL
         self.async_write_ha_state()
 
+        @callback
         def _later(_now: Any) -> None:
+            # Ohne @callback fuehrt HA die Funktion im Executor-Thread aus,
+            # und async_create_task darf dort nicht aufgerufen werden.
             self.hass.async_create_task(self.coordinator.async_request_refresh())
 
         for delay in self.REFRESH_DELAYS:
