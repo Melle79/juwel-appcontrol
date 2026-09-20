@@ -166,7 +166,7 @@
         },
         "feedings": {
           "name": "Fütterungen",
-          "description": "Liste der Fütterungen, z. B. [{\"time\": \"08:00\", \"amount\": 2}]. Menge 1–8. Leer lassen, um die bisherigen Zeiten zu behalten."
+          "description": "Liste der Fütterungen, je mit Uhrzeit (HH:MM) und Menge von 1 bis 8. Leer lassen, um die bisherigen Zeiten zu behalten."
         }
       }
     }

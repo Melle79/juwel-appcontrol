@@ -166,7 +166,7 @@
         },
         "feedings": {
           "name": "Feedings",
-          "description": "List of feedings, e.g. [{\"time\": \"08:00\", \"amount\": 2}]. Amount 1-8. Leave empty to keep the current times."
+          "description": "List of feedings, each with a time (HH:MM) and an amount from 1 to 8. Leave empty to keep the current times."
         }
       }
     }
