@@ -116,46 +116,80 @@ def _weekdays(raw: str) -> tuple[list[int], str]:
 class _FeedPlanMixin:
     """Schreiben des Futterplans - am Plan-Sensor angesiedelt."""
 
+    # Womit ein neu angelegter Plan startet, falls das Geraet auf einen
+    # Plan zeigt, den es in der Cloud nicht mehr gibt.
+    NEW_PLAN_NAME = "Home Assistant"
+    NEW_PLAN_COLOR = "#B5D4E3"
+
+    @staticmethod
+    def _interval(weekdays: list[str]) -> str:
+        """Wochentage in die commandInterval-Schreibweise bringen."""
+        if "all" in weekdays:
+            return "* * *;"
+        nums = sorted({WEEKDAY_TO_NUMBER[d] for d in weekdays})
+        return "* * " + ",".join(str(n) for n in nums) + ";"
+
+    @staticmethod
+    def _events(feedings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Fuetterungen in timeEvents umrechnen: Minuten ab Mitternacht."""
+        events = []
+        for index, item in enumerate(feedings):
+            hours, _, minutes = str(item["time"])[:5].partition(":")
+            try:
+                total = int(hours) * 60 + int(minutes)
+            except ValueError as err:
+                raise ValueError(
+                    f"Invalid time {item['time']!r}, expected HH:MM"
+                ) from err
+            if not 0 <= total < 24 * 60:
+                raise ValueError(f"Time {item['time']!r} is outside a day")
+            events.append(
+                {"id": 200 + index, "time": total,
+                 "value": {"amount": int(item.get("amount", 1))}}
+            )
+        events.sort(key=lambda event: event["time"])
+        return events
+
     async def async_set_feeding_plan(
         self, weekdays: list[str] | None = None,
         feedings: list[dict[str, Any]] | None = None,
     ) -> None:
-        plan = self._plan
-        if not plan:
-            raise ValueError("No feeding plan assigned to this feeder")
-
+        """Futterplan schreiben - vorhandenen aendern oder einen anlegen."""
         client = self.coordinator.client
         presets = await client.get_feeder_presets()
-        target = next((p for p in presets if str(p.get("id")) == str(plan.get("id"))), None)
+
+        data = self.coordinator.data.get(self._cid, {})
+        wanted = (data.get("info") or {}).get("fishFeederPresetIdList") or []
+        by_id = {str(p.get("id")): p for p in presets}
+        target = next((by_id[str(pid)] for pid in wanted if str(pid) in by_id), None)
+
         if target is None:
-            raise ValueError("Feeding plan not found in the cloud list")
+            # Das Geraet verweist auf einen Plan, den die Cloud nicht (mehr)
+            # fuehrt. Unter genau dieser Kennung einen neuen anlegen, sonst
+            # bliebe der Verweis ins Leere zeigen.
+            if not wanted:
+                raise ValueError("This feeder has no feeding plan assigned")
+            if not weekdays or not feedings:
+                raise ValueError(
+                    "There is no feeding plan yet - please pass both weekdays "
+                    "and feedings so a new one can be created"
+                )
+            target = {
+                "id": str(wanted[0]),
+                "name": self.NEW_PLAN_NAME,
+                "type": "user",
+                "color": self.NEW_PLAN_COLOR,
+                "timeEvents": [],
+                "commandInterval": "* * *;",
+            }
+            presets.append(target)
 
         if weekdays:
-            if "all" in weekdays:
-                days = "*"
-            else:
-                nums = sorted({WEEKDAY_TO_NUMBER[d] for d in weekdays})
-                days = ",".join(str(n) for n in nums)
-            target["commandInterval"] = f"* * {days};"
-
+            target["commandInterval"] = self._interval(weekdays)
         if feedings:
-            events = []
-            for i, item in enumerate(feedings):
-                hhmm = str(item["time"])[:5]
-                hours, _, minutes = hhmm.partition(":")
-                try:
-                    total = int(hours) * 60 + int(minutes)
-                except ValueError as err:
-                    raise ValueError(f"Invalid time {item['time']!r}, expected HH:MM") from err
-                events.append({
-                    "id": 200 + i,
-                    "time": total,
-                    "value": {"amount": int(item.get("amount", 1))},
-                })
-            events.sort(key=lambda e: e["time"])
-            target["timeEvents"] = events
+            target["timeEvents"] = self._events(feedings)
 
-        await client.set_feeder_presets(presets)
+        await client.save_feeder_preset(target)
         await self.coordinator.async_request_refresh()
 
 

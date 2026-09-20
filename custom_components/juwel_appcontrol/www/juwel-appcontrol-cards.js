@@ -1,5 +1,5 @@
 /*
- * Juwel AppControl Cards  v2.5.0
+ * Juwel AppControl Cards  v2.5.1
  * Lovelace card for the "juwel_appcontrol" integration.
  *
  * Options (all available in the visual editor):
@@ -41,6 +41,7 @@ const I18N = {
     feedPlan: "Feeding plan", addFeeding: "Add feeding", save: "Save plan",
     saving: "Saving…", removeFeeding: "Remove", everyDay: "every day",
     fPlan: "Show feeding plan", pickDay: "Pick at least one day",
+    createPlan: "Create plan",
   },
   de: {
     status: "Status", online: "Online", offline: "Offline",
@@ -64,6 +65,7 @@ const I18N = {
     feedPlan: "Futterplan", addFeeding: "Fütterung hinzufügen", save: "Plan speichern",
     saving: "Speichert…", removeFeeding: "Entfernen", everyDay: "täglich",
     fPlan: "Futterplan anzeigen", pickDay: "Mindestens ein Tag muss bleiben",
+    createPlan: "Plan anlegen",
   },
 };
 
@@ -991,12 +993,16 @@ class JuwelFeederCard extends HTMLElement {
 
   _draftFrom(a) {
     const K = JuwelFeederCard.DAY_KEYS;
+    const days = (a.weekdays || []).map((n) => K[n]).filter(Boolean);
+    const feedings = (a.feedings || [])
+      .map((f) => ({ time: String(f.time || "00:00").slice(0, 5),
+                     amount: Math.max(1, Math.min(8, Number(f.amount) || 1)) }))
+      .sort((x, y) => x.time.localeCompare(y.time));
+    // Noch kein Plan hinterlegt: mit etwas Brauchbarem anfangen, statt den
+    // Planer leer oder gar nicht zu zeigen.
     return {
-      days: (a.weekdays || []).map((n) => K[n]).filter(Boolean),
-      feedings: (a.feedings || [])
-        .map((f) => ({ time: String(f.time || "00:00").slice(0, 5),
-                       amount: Math.max(1, Math.min(8, Number(f.amount) || 1)) }))
-        .sort((x, y) => x.time.localeCompare(y.time)),
+      days: days.length ? days : [...JuwelFeederCard.DAY_ORDER],
+      feedings: feedings.length ? feedings : [{ time: "18:00", amount: 1 }],
     };
   }
 
@@ -1006,9 +1012,11 @@ class JuwelFeederCard extends HTMLElement {
   }
 
   _planHtml(T, a) {
-    if (!a.feedings && !a.weekdays) return "";
     const d = this._draft || this._draftFrom(a);
     const ORDER = JuwelFeederCard.DAY_ORDER;
+    // Ohne Plan in der Cloud gibt es nichts zu bewahren - dann darf gleich
+    // gespeichert werden.
+    const isNew = !(a.feedings && a.feedings.length);
 
     const chips = ORDER.map((k, i) =>
       `<button class="chip${d.days.includes(k) ? " on" : ""}" data-day="${k}">${T.days[i]}</button>`
@@ -1036,8 +1044,8 @@ class JuwelFeederCard extends HTMLElement {
               ${rows}
               <button class="wall ghost" id="addfeed"
                       ${d.feedings.length >= 8 ? "disabled" : ""}>+ ${T.addFeeding}</button>
-              <button class="wall" id="saveplan" ${this._dirty ? "" : "disabled"}>
-                ${this._saving ? T.saving : T.save}</button>
+              <button class="wall" id="saveplan" ${this._dirty || isNew ? "" : "disabled"}>
+                ${this._saving ? T.saving : isNew ? T.createPlan : T.save}</button>
             </details>`;
   }
 

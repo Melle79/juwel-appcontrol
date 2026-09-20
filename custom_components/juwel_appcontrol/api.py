@@ -81,8 +81,12 @@ class JuwelCloud:
                     self._token = None
                     return await self._request(method, path, json, _retry=False)
                 text = await resp.text()
-                if resp.status not in (200, 201):
+                # 204 quittiert die Cloud auf Schreibbefehle ohne Rumpf -
+                # das ist Erfolg, kein Fehler.
+                if resp.status not in (200, 201, 202, 204):
                     raise JuwelApiError(f"{method} {path} -> HTTP {resp.status}: {text[:200]}")
+                if resp.status == 204 or not text:
+                    return None
                 if resp.content_type == "application/json":
                     return await resp.json()
                 return text
@@ -107,13 +111,15 @@ class JuwelCloud:
             _LOGGER.debug("Futterplaene nicht abrufbar: %s", err)
             return []
 
-    async def set_feeder_presets(self, presets: list[dict[str, Any]]) -> Any:
-        """Futterplaene schreiben.
+    async def save_feeder_preset(self, preset: dict[str, Any]) -> Any:
+        """Einen Futterplan speichern - anlegen oder ueberschreiben.
 
-        Die Cloud kennt nur einen Sammelschreibzugriff: die komplette Liste
-        wird ersetzt. Diese Liste ist von den Lichtprofilen getrennt.
+        Die Cloud quittiert mit 204 ohne Rumpf. `/presets/feeder/set` nimmt
+        zwar eine Liste an und antwortet ebenfalls mit 204, speichert aber
+        nichts - der Weg fuehrt ueber diesen Endpunkt mit einem einzelnen
+        Plan. Geprueft an echter Hardware am 20.09.2026.
         """
-        return await self._request("POST", "/presets/feeder/set", json={"list": presets})
+        return await self._request("POST", "/presets/feeder", json=preset)
 
     async def get_product_config(self, product_id: str) -> dict[str, Any] | None:
         """Fähigkeitsbeschreibung eines Produkts (traits mit msg_key/Schema)."""
