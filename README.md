@@ -229,24 +229,22 @@ data:
       amount: 1
 ```
 
-> This replaces the whole feeding plan, which is how the cloud API works — there is
-> no way to change a single entry. Fields you leave out keep their current value.
-> If the feeder has no plan at all, one is created — pass both fields in that case.
+> This replaces the whole feeding plan — the service has no way to change a single
+> entry. Fields you leave out keep their current value. If the feeder has no plan
+> at all, one is created; pass both fields in that case.
 
 ---
 
 ## Notes
 
 - **Cloud polling**, default interval 60 s.
-- This uses the **unofficial** manufacturer API (`app-api.prod.qconnex.io`).
-  If Juwel changes it, the integration has to be adapted. No warranty, and no
-  affiliation with JUWEL Aquarium GmbH & Co. KG.
+- This talks to the manufacturer's own cloud service, the same one the MyJUWEL
+  app uses, with your MyJUWEL account. There is no public or documented API for
+  it, so if Juwel changes the service, the integration has to be adapted. No
+  warranty, and no affiliation with JUWEL Aquarium GmbH & Co. KG.
 - Tested with **HeliaLux AppControl** (firmware V2.0.1.3) and **SmartFeed
   AppControl** (firmware V2.0.1.58) on Home Assistant 2026.9. Lighting weekly plan
   and feeding planner are both verified on real hardware.
-- Writing a feeding plan goes to `POST /presets/feeder` with the single plan.
-  `/presets/feeder/set` answers `204` as well but stores nothing — verified on
-  real hardware.
 - The manufacturer's product catalogue declares some values as objects where the
   devices actually use plain numbers. The integration mirrors whatever the device
   reports instead of trusting the schema — verified on both devices.
