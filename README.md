@@ -90,6 +90,10 @@ Lighting devices:
 | `switch.<name>_automatic_mode` | Schedule on/off |
 | `sensor.<name>_profile` | Active profile; exposes the daily curve as attribute `time_events` |
 
+Every device also gets diagnostics: **last contact**, and **signal strength** where
+the device reports it. Firmware, hardware revision and serial number show up on the
+device page.
+
 Feeder (SmartFeed):
 
 | Entity | Description |
@@ -106,6 +110,12 @@ Feeder (SmartFeed):
 
 The pump gets entities derived from its traits — switches, a select and buttons
 where the specification defines a clear value range, sensors otherwise.
+
+> **The manufacturer's catalogue is incomplete.** On the two devices verified here
+> it declares 6 of 25 state fields. Anything a device reports that the catalogue
+> does not describe is therefore offered as a **disabled diagnostic sensor** —
+> enable it on the device page. For an EccoFlow that should include the water
+> temperature, which the product page advertises but the catalogue omits.
 
 > **Automatic vs. manual (lighting):** While the schedule is running, the lamp
 > ignores manual commands — exactly like the app, where the sliders are greyed out.
@@ -245,6 +255,9 @@ data:
 - Tested with **HeliaLux AppControl** (firmware V2.0.1.3) and **SmartFeed
   AppControl** (firmware V2.0.1.58) on Home Assistant 2026.9. Lighting weekly plan
   and feeding planner are both verified on real hardware.
+- The EccoFlow measures water temperature and raises alarms for blocked rotor,
+  critical water level and temperature limits. None of this is in the product
+  catalogue, so those values arrive as disabled diagnostic sensors.
 - The manufacturer's product catalogue declares some values as objects where the
   devices actually use plain numbers. The integration mirrors whatever the device
   reports instead of trusting the schema — verified on both devices.

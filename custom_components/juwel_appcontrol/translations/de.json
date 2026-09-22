@@ -130,6 +130,12 @@
       },
       "feed_plan": {
         "name": "Futterplan"
+      },
+      "last_seen": {
+        "name": "Letzter Kontakt"
+      },
+      "signal_strength": {
+        "name": "Signalstärke"
       }
     },
     "binary_sensor": {

@@ -19,6 +19,23 @@ from .coordinator import JuwelCoordinator
 from .entity import JuwelEntity
 from .traits import LIGHT_TRAITS, SKIP_TRAITS, TraitSpec, device_type, slug
 
+# Zustandsfelder, die die Integration bereits auswertet oder die reine
+# Buchhaltung der Cloud sind. Alles andere wird als abgeschalteter
+# Diagnosesensor angeboten - der Produktkatalog deklariert naemlich nur
+# einen Bruchteil dessen, was die Geraete tatsaechlich melden (bei Licht
+# und Futterautomat sind es 6 von 25 Feldern).
+BEKANNTE_FELDER = frozenset({
+    # von der Integration bereits verwendet
+    "active_preset", "connected", "error", "feed_chamber_status",
+    "feed_motor_status", "feed_trigger", "fwversion", "lastActivityTime",
+    "last_feed_ts", "preset_count", "preset_id_by_weekday", "presets",
+    "wifi_parameters",
+    # interne Buchhaltung ohne Aussagewert
+    "active_command", "active_scene", "fade", "group", "id", "last_routine_ts",
+    "last_update", "open_slots", "order", "power_on", "preview",
+    "reset_reason", "sdkversion", "service", "timeout", "type",
+})
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -47,6 +64,30 @@ async def async_setup_entry(
             entities.append(JuwelMotorSensor(coordinator, cid))
             entities.append(JuwelLastFeedSensor(coordinator, cid))
             entities.append(JuwelFeedPlanSensor(coordinator, cid))
+
+        # Diagnose: wann hat das Geraet zuletzt gemeldet, und wie steht es
+        # um den Empfang. Beides ist bei einer reinen Cloud-Anbindung das
+        # Erste, was man wissen will, wenn etwas hakt.
+        state = data.get("state") or {}
+        if "lastActivityTime" in state:
+            entities.append(JuwelLastSeenSensor(coordinator, cid))
+        if isinstance(state.get("wifi_parameters"), dict):
+            entities.append(JuwelSignalSensor(coordinator, cid))
+
+        # Undeklarierte Zustandsfelder: abgeschaltet angeboten, damit ein
+        # Geraet, das wir nicht kennen, nichts verschweigt - etwa die
+        # Wassertemperatur der EccoFlow, die im Katalog fehlt.
+        # Achtung: traits ist nach trait-Namen abgelegt, die Zustandsfelder
+        # heissen aber nach msg_key - sonst legen wir Dubletten an.
+        deklariert = {spec.msg_key for spec in traits.values()}
+        for key, value in sorted(state.items()):
+            if key in BEKANNTE_FELDER or key in deklariert:
+                continue
+            if not isinstance(value, (bool, int, float, str)):
+                continue
+            if isinstance(value, str) and len(value) > 64:
+                continue
+            entities.append(JuwelRohfeldSensor(coordinator, cid, key))
 
     async_add_entities(entities)
 
@@ -498,3 +539,77 @@ class JuwelPresetSensor(JuwelEntity, SensorEntity):
             "auto_switch_entity": find("switch", "auto"),
             "channel_entities": {k: v for k, v in channels.items() if v},
         }
+
+
+class JuwelLastSeenSensor(JuwelEntity, SensorEntity):
+    """Wann sich das Geraet zuletzt bei der Cloud gemeldet hat."""
+
+    _attr_translation_key = "last_seen"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: JuwelCoordinator, cloud_device_id: str) -> None:
+        super().__init__(coordinator, cloud_device_id)
+        self._attr_unique_id = f"{cloud_device_id}_last_seen"
+
+    @property
+    def native_value(self):
+        raw = self._state.get("lastActivityTime")
+        return dt_util.parse_datetime(raw) if raw else None
+
+
+class JuwelSignalSensor(JuwelEntity, SensorEntity):
+    """Empfangsstaerke des Geraets im WLAN."""
+
+    _attr_translation_key = "signal_strength"
+    _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
+    _attr_native_unit_of_measurement = "dBm"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: JuwelCoordinator, cloud_device_id: str) -> None:
+        super().__init__(coordinator, cloud_device_id)
+        self._attr_unique_id = f"{cloud_device_id}_signal"
+
+    @property
+    def native_value(self):
+        params = self._state.get("wifi_parameters")
+        return params.get("rssi") if isinstance(params, dict) else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        params = self._state.get("wifi_parameters")
+        if not isinstance(params, dict):
+            return {}
+        return {
+            "channel": params.get("channel"),
+            "ssid": (self._device or {}).get("ssid"),
+        }
+
+
+class JuwelRohfeldSensor(JuwelEntity, SensorEntity):
+    """Ein Zustandsfeld, das der Produktkatalog nicht deklariert.
+
+    Standardmaessig abgeschaltet: bei bekannten Geraeten waere es Wildwuchs,
+    bei unbekannten ist es der einzige Weg an Werte heranzukommen, die der
+    Hersteller nicht dokumentiert.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self, coordinator: JuwelCoordinator, cloud_device_id: str, key: str
+    ) -> None:
+        super().__init__(coordinator, cloud_device_id)
+        self._key = key
+        self._attr_unique_id = f"{cloud_device_id}_raw_{slug(key)}"
+        self._attr_name = key.replace("_", " ").strip().capitalize()
+
+    @property
+    def native_value(self):
+        value = self._state.get(self._key)
+        if isinstance(value, bool):
+            return "on" if value else "off"
+        if isinstance(value, str) and len(value) > 255:
+            return value[:255]
+        return value

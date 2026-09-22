@@ -76,12 +76,18 @@ class JuwelEntity(CoordinatorEntity[JuwelCoordinator]):
         connections = set()
         if mac := info.get("localDeviceId"):
             connections = {(CONNECTION_NETWORK_MAC, format_mac(mac))}
+        # Die Firmware steht im Kontodokument, ist dort aber gelegentlich
+        # aelter als das, was das Geraet selbst meldet - darum zuerst den
+        # Geraetezustand fragen.
+        firmware = self._state.get("fwversion") or info.get("firmwareVersion")
         return DeviceInfo(
             identifiers={(DOMAIN, self._cid)},
             name=info.get("name", "HeliaLux"),
             manufacturer="Juwel",
             model=info.get("productId", "HeliaLux AppControl"),
-            sw_version=info.get("firmwareVersion"),
+            sw_version=firmware,
+            hw_version=info.get("hardwareRevision"),
+            serial_number=info.get("localDeviceId"),
             connections=connections,
         )
 

@@ -22,4 +22,4 @@ LIGHT_PRODUCT_IDS = ("@juwel.lighting.helialux1",)
 # Dashboard-Karte, die die Integration selbst mitbringt
 CARD_FILENAME = "juwel-appcontrol-cards.js"
 CARD_URL_BASE = f"/{DOMAIN}"
-CARD_VERSION = "2.5.1"
+CARD_VERSION = "2.5.4"

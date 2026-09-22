@@ -1,5 +1,5 @@
 /*
- * Juwel AppControl Cards  v2.5.1
+ * Juwel AppControl Cards  v2.5.4
  * Lovelace card for the "juwel_appcontrol" integration.
  *
  * Options (all available in the visual editor):
@@ -685,13 +685,46 @@ class JuwelHelialuxCardEditor extends HTMLElement {
   }
 }
 
-// Doppelt-Laden abfangen (z. B. alter Ressourcen-Eintrag + Auto-Registrierung)
-if (!customElements.get("juwel-helialux-card")) {
-  customElements.define("juwel-helialux-card", JuwelHelialuxCard);
+
+/* ----------------------------------------------------------------------
+ *  Registrierung mit Nachkontrolle
+ *
+ *  Ein blosses `if (!customElements.get(x)) define(x)` genuegt hier nicht:
+ *  In einer Installation mit card-mod, browser_mod, card-tools und
+ *  kiosk-mode kam es vor, dass das Modul vollstaendig durchlief - die
+ *  Eintraege in window.customCards waren da - waehrend customElements die
+ *  Elemente hinterher nicht kannte. Das Dashboard zeigte dann
+ *  "Konfigurationsfehler", ohne dass irgendwo ein Fehler auftauchte.
+ *
+ *  Darum: define() absichern, danach pruefen, ob es gegriffen hat, und im
+ *  Zweifel noch einmal versuchen. Und in jedem Fall etwas sagen.
+ * -------------------------------------------------------------------- */
+const JUWEL_ELEMENTE = [];
+
+function juwelRegistriere(name, klasse) {
+  if (!JUWEL_ELEMENTE.some((e) => e.name === name)) {
+    JUWEL_ELEMENTE.push({ name, klasse });
+  }
+  const vorhanden = customElements.get(name);
+  if (vorhanden === klasse) return true;
+  if (vorhanden) {
+    console.warn(`[juwel] ${name}: bereits anderweitig registriert - uebersprungen`);
+    return true;
+  }
+  try {
+    customElements.define(name, klasse);
+  } catch (err) {
+    console.error(`[juwel] ${name}: define() ist fehlgeschlagen`, err);
+    return false;
+  }
+  if (customElements.get(name)) return true;
+
+  console.error(`[juwel] ${name}: nach define() nicht auffindbar`);
+  return false;
 }
-if (!customElements.get("juwel-helialux-card-editor")) {
-  customElements.define("juwel-helialux-card-editor", JuwelHelialuxCardEditor);
-}
+
+juwelRegistriere("juwel-helialux-card", JuwelHelialuxCard);
+juwelRegistriere("juwel-helialux-card-editor", JuwelHelialuxCardEditor);
 
 window.customCards = window.customCards || [];
 if (!window.customCards.some((c) => c.type === "juwel-helialux-card"))
@@ -703,7 +736,8 @@ window.customCards.push({
   documentationURL: "https://github.com/Melle79/juwel-helialux",
 });
 
-console.info("%c JUWEL-HELIALUX-CARD %c v2.0.0 ", "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");
+console.info("%c JUWEL-APPCONTROL %c v2.5.4 ",
+  "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");
 
 /* ======================================================================
  *  Juwel Feeder Card  —  SmartFeed AppControl
@@ -1272,12 +1306,8 @@ class JuwelFeederCardEditor extends HTMLElement {
   }
 }
 
-if (!customElements.get("juwel-feeder-card")) {
-  customElements.define("juwel-feeder-card", JuwelFeederCard);
-}
-if (!customElements.get("juwel-feeder-card-editor")) {
-  customElements.define("juwel-feeder-card-editor", JuwelFeederCardEditor);
-}
+juwelRegistriere("juwel-feeder-card", JuwelFeederCard);
+juwelRegistriere("juwel-feeder-card-editor", JuwelFeederCardEditor);
 if (!window.customCards.some((c) => c.type === "juwel-feeder-card"))
   window.customCards.push({
     type: "juwel-feeder-card",
@@ -1286,3 +1316,48 @@ if (!window.customCards.some((c) => c.type === "juwel-feeder-card"))
     preview: true,
     documentationURL: "https://github.com/Melle79/juwel-appcontrol",
   });
+
+// ----------------------------------------------------------------------
+//  Wachhund
+//
+//  In einer Installation mit card-mod, browser_mod, card-tools und
+//  kiosk-mode wurde beobachtet, dass die Elemente beim Laden nachweislich
+//  registriert waren und spaeter trotzdem fehlten - ohne Fehlermeldung
+//  irgendwo. Das Dashboard zeigte dann "Konfigurationsfehler".
+//
+//  Die Ursache ist ungeklaert. Darum wird eine Weile nachgesehen und bei
+//  Bedarf neu registriert: sobald das Element wieder da ist, loest HA
+//  ueber customElements.whenDefined() von sich aus einen Neuaufbau aus.
+// ----------------------------------------------------------------------
+{
+  const nachsehen = (anlass) => {
+    let wiederhergestellt = 0;
+    for (const { name, klasse } of JUWEL_ELEMENTE) {
+      if (customElements.get(name)) continue;
+      try {
+        customElements.define(name, klasse);
+        wiederhergestellt += 1;
+        console.warn(`[juwel] ${name} war verschwunden (${anlass}) - neu registriert`);
+      } catch (err) {
+        console.error(`[juwel] ${name}: erneute Registrierung fehlgeschlagen`, err);
+      }
+    }
+    return wiederhergestellt;
+  };
+
+  const fehlt = JUWEL_ELEMENTE.filter((e) => !customElements.get(e.name));
+  if (fehlt.length) {
+    console.error("[juwel] direkt nach dem Laden nicht registriert:",
+                  fehlt.map((e) => e.name).join(", "));
+  }
+
+  // Gestaffelt nachsehen: deckt sowohl fruehe als auch spaete Eingriffe ab.
+  for (const ms of [200, 800, 2000, 5000, 10000, 20000]) {
+    setTimeout(() => nachsehen(`${ms} ms`), ms);
+  }
+  // Und wenn der Nutzer die Ansicht wechselt oder zurueckkommt.
+  window.addEventListener("location-changed", () => nachsehen("Ansichtswechsel"));
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) nachsehen("Tab wieder sichtbar");
+  });
+}

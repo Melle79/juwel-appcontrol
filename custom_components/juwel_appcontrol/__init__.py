@@ -51,8 +51,13 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     url = f"{CARD_URL_BASE}/{CARD_FILENAME}"
     versioned = f"{url}?v={CARD_VERSION}"
     try:
+        # Mit Cache-Headern ausliefern, wie /hacsfiles und /local es auch tun.
+        # Ohne sie laedt der Browser die Datei bei jedem Seitenaufruf neu; kommt
+        # sie dann zu spaet, ist das Element beim Zeichnen noch unbekannt und das
+        # Dashboard zeigt einen Konfigurationsfehler. Das ?v=<Version> an der
+        # Adresse holt nach einem Update ohnehin eine frische Fassung.
         await hass.http.async_register_static_paths(
-            [StaticPathConfig(url, card_path, cache_headers=False)]
+            [StaticPathConfig(url, card_path, cache_headers=True)]
         )
         add_extra_js_url(hass, versioned)
         hass.data[_CARD_KEY] = True
