@@ -125,8 +125,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Integration aus einem Config-Entry einrichten."""
     await _async_register_card(hass)   # Rückfall, falls async_setup uebersprungen wurde
 
-    session = async_get_clientsession(hass)
-    client = JuwelCloud(session, entry.data[CONF_EMAIL], entry.data[CONF_PASSWORD])
+    client = JuwelCloud(
+        lambda: async_get_clientsession(hass),
+        entry.data[CONF_EMAIL],
+        entry.data[CONF_PASSWORD],
+    )
 
     coordinator = JuwelCoordinator(hass, client)
     await coordinator.async_config_entry_first_refresh()

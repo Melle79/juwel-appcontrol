@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 import logging
 from typing import Any
 
@@ -24,13 +25,25 @@ class JuwelCloud:
     """Kapselt Login und Gerätesteuerung gegen die qconnex-Cloud."""
 
     def __init__(
-        self, session: aiohttp.ClientSession, email: str, password: str
+        self,
+        session: aiohttp.ClientSession | Callable[[], aiohttp.ClientSession],
+        email: str,
+        password: str,
     ) -> None:
-        self._session = session
+        # Die Sitzung wird bei jedem Aufruf neu erfragt, wenn eine Funktion
+        # uebergeben wurde. Eine einmal gemerkte Sitzung schliesst Home
+        # Assistant beim Herunterfahren oder Neuladen - eine noch laufende
+        # Abfrage lief dann in "RuntimeError: Session is closed".
+        self._session_quelle = session
         self._email = email
         self._password = password
         self._token: str | None = None
         self._lock = asyncio.Lock()
+
+    @property
+    def _session(self) -> aiohttp.ClientSession:
+        quelle = self._session_quelle
+        return quelle() if callable(quelle) else quelle
 
     # ---- intern -------------------------------------------------------
 
@@ -56,6 +69,14 @@ class JuwelCloud:
                 if resp.status == 401:
                     raise JuwelAuthError("E-Mail oder Passwort falsch")
                 raise JuwelApiError(f"Login HTTP {resp.status}: {text[:200]}")
+        except RuntimeError as err:
+            # Beim Herunterfahren schliesst Home Assistant die gemeinsame
+            # HTTP-Sitzung, waehrend eine Abfrage noch laeuft. Das ist kein
+            # Fehler der Integration und gehoert nicht als Stapelabzug ins
+            # Protokoll.
+            if "Session is closed" not in str(err):
+                raise
+            raise JuwelApiError("Home Assistant faehrt herunter") from err
         except aiohttp.ClientError as err:
             raise JuwelApiError(f"Verbindungsfehler beim Login: {err}") from err
 
@@ -90,6 +111,14 @@ class JuwelCloud:
                 if resp.content_type == "application/json":
                     return await resp.json()
                 return text
+        except RuntimeError as err:
+            # Beim Herunterfahren schliesst Home Assistant die gemeinsame
+            # HTTP-Sitzung, waehrend eine Abfrage noch laeuft. Das ist kein
+            # Fehler der Integration und gehoert nicht als Stapelabzug ins
+            # Protokoll.
+            if "Session is closed" not in str(err):
+                raise
+            raise JuwelApiError("Home Assistant faehrt herunter") from err
         except aiohttp.ClientError as err:
             raise JuwelApiError(f"Verbindungsfehler {method} {path}: {err}") from err
 

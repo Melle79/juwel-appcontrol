@@ -36,8 +36,9 @@ class JuwelConfigFlow(ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(email.lower())
             self._abort_if_unique_id_configured()
 
-            session = async_get_clientsession(self.hass)
-            client = JuwelCloud(session, email, user_input[CONF_PASSWORD])
+            client = JuwelCloud(
+                lambda: async_get_clientsession(self.hass), email, user_input[CONF_PASSWORD]
+            )
             try:
                 await client.async_validate()
             except JuwelAuthError:
