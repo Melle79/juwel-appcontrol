@@ -1,5 +1,5 @@
 /*
- * Juwel AppControl Cards  v2.5.4
+ * Juwel AppControl Cards  v2.5.5
  * Lovelace card for the "juwel_appcontrol" integration.
  *
  * Options (all available in the visual editor):
@@ -37,6 +37,7 @@ const I18N = {
     quantity: "Quantity", statusLed: "Status LED",
     chamber: "Feed chamber", chamberEmpty: "Empty", chamberOk: "Filled",
     motor: "Auger", lastFeed: "Last feeding", never: "never",
+    running: "running", idle: "idle", stuck: "stuck",
     noPlan: "no plan", amount: "amount", fFeeder: "Feeder (Juwel AppControl)",
     feedPlan: "Feeding plan", addFeeding: "Add feeding", save: "Save plan",
     saving: "Saving…", removeFeeding: "Remove", everyDay: "every day",
@@ -61,6 +62,7 @@ const I18N = {
     quantity: "Menge", statusLed: "Status-LED",
     chamber: "Futterkammer", chamberEmpty: "Leer", chamberOk: "Gefüllt",
     motor: "Futterschnecke", lastFeed: "Letzte Fütterung", never: "nie",
+    running: "läuft", idle: "steht", stuck: "hängt",
     noPlan: "kein Plan", amount: "Menge", fFeeder: "Futterautomat (Juwel AppControl)",
     feedPlan: "Futterplan", addFeeding: "Fütterung hinzufügen", save: "Plan speichern",
     saving: "Speichert…", removeFeeding: "Entfernen", everyDay: "täglich",
@@ -736,7 +738,7 @@ window.customCards.push({
   documentationURL: "https://github.com/Melle79/juwel-helialux",
 });
 
-console.info("%c JUWEL-APPCONTROL %c v2.5.4 ",
+console.info("%c JUWEL-APPCONTROL %c v2.5.5 ",
   "background:#0b2239;color:#fff", "background:#2b6cb0;color:#fff");
 
 /* ======================================================================
@@ -947,8 +949,16 @@ class JuwelFeederCard extends HTMLElement {
                  plan.attributes.friendly_name || "SmartFeed";
     const chamber = this._st(ids.chamber);
     const empty = chamber && chamber.state === "on";
+    // Eine Fuetterung dauert Sekunden. Bleibt "running" laenger stehen, hat
+    // das Geraet die Fuetterung nie abgeschlossen - beobachtet bei leerer
+    // Kammer, wo der Zustand tagelang haengen blieb und den Knopf sperrte.
     const motor = this._st(ids.motor);
-    const busy = motor && motor.state === "running";
+    const laeuft = !!motor && motor.state === "running";
+    const seit = laeuft && motor.last_changed
+      ? (Date.now() - new Date(motor.last_changed).getTime()) / 1000
+      : 0;
+    const busy = laeuft && seit < JuwelFeederCard.FEED_TIMEOUT;
+    const haengt = laeuft && seit >= JuwelFeederCard.FEED_TIMEOUT;
     const last = this._st(ids.last);
     const online = plan.state !== "unavailable";
 
@@ -1006,12 +1016,26 @@ class JuwelFeederCard extends HTMLElement {
       <div class="facts">
         <div class="fact"><span class="k">${T.chamber}</span>
           <span class="${empty ? "warn" : ""}">${empty ? T.chamberEmpty : T.chamberOk}</span></div>
-        ${motor ? `<div class="fact"><span class="k">${T.motor}</span><span>${motor.state}</span></div>` : ""}
+        ${motor ? `<div class="fact"><span class="k">${T.motor}</span>
+          <span class="${haengt ? "warn" : ""}">${
+            haengt ? `${T.stuck} (${this._dauer(seit)})`
+                   : busy ? T.running : T.idle}</span></div>` : ""}
         <div class="fact"><span class="k">${T.lastFeed}</span><span>${lastTxt}</span></div>
       </div>`;
 
     this._wire(ids);
     this._wirePlan(T, ids);
+  }
+
+  static get FEED_TIMEOUT() {
+    return 120;   // Sekunden, grosszuegig - eine Fuetterung dauert wenige davon
+  }
+
+  _dauer(sekunden) {
+    const m = Math.round(sekunden / 60);
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60);
+    return h < 24 ? `${h} h` : `${Math.floor(h / 24)} d`;
   }
 
   /* ---------- Wochenplaner ---------- */
