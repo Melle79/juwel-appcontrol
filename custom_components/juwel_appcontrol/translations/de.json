@@ -176,5 +176,18 @@
         }
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Optionen",
+        "data": {
+          "scan_interval": "Abfrageintervall"
+        },
+        "data_description": {
+          "scan_interval": "Wie oft die Cloud gefragt wird. Die Geräte melden träge und der Tagesverlauf ändert sich sanft — ein längeres Intervall verpasst nichts und halbiert die Anfragen."
+        }
+      }
+    }
   }
 }

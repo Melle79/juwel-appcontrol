@@ -91,6 +91,8 @@ class JuwelChannelNumber(JuwelEntity, NumberEntity):
     def native_value(self) -> float | None:
         if not self._state:
             return None
+        if (kurve := self._curve_pct) is not None:
+            return round(kurve.get(self._ch.key, 0.0))
         return _raw_to_pct(self._raw(self._ch.key))
 
     async def async_set_native_value(self, value: float) -> None:

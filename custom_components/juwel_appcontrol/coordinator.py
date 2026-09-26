@@ -18,12 +18,17 @@ _LOGGER = logging.getLogger(__name__)
 class JuwelCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     """Holt Geräteliste + Zustände regelmäßig aus der Cloud."""
 
-    def __init__(self, hass: HomeAssistant, client: JuwelCloud) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        client: JuwelCloud,
+        scan_interval: int = DEFAULT_SCAN_INTERVAL,
+    ) -> None:
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
+            update_interval=timedelta(seconds=scan_interval),
         )
         self.client = client
         self.devices: dict[str, dict[str, Any]] = {}

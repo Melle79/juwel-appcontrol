@@ -13,7 +13,10 @@ from homeassistant.helpers.device_registry import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from homeassistant.util import dt as dt_util
+
 from .const import DOMAIN
+from .curve import values_at
 from .coordinator import JuwelCoordinator
 
 
@@ -90,6 +93,21 @@ class JuwelEntity(CoordinatorEntity[JuwelCoordinator]):
             serial_number=info.get("localDeviceId"),
             connections=connections,
         )
+
+    @property
+    def _curve_pct(self) -> dict[str, float] | None:
+        """Kanalwerte aus dem Profil, wenn der Automatikbetrieb laeuft.
+
+        Das Geraet meldet im Automatikbetrieb keine Zwischenwerte - die
+        gemeldeten Kanaele koennen tagelang auf dem letzten Stand stehen
+        bleiben. Dann ist das Profil die Wahrheit, nicht der Messwert.
+        """
+        state = self._state
+        if state.get("mode") != "auto" or state.get("preview"):
+            return None
+        data = self.coordinator.data.get(self._cid, {})
+        jetzt = dt_util.now()
+        return values_at(data.get("active_preset"), jetzt.hour * 60 + jetzt.minute)
 
     @property
     def available(self) -> bool:

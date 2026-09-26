@@ -90,6 +90,14 @@ Lighting devices:
 | `switch.<name>_automatic_mode` | Schedule on/off |
 | `sensor.<name>_profile` | Active profile; exposes the daily curve as attribute `time_events` |
 
+> **Where the light's values come from.** In automatic mode the device does not
+> report intermediate channel values — they were observed frozen on the daytime
+> plateau for four days while the tank was dark at night, because the cloud only
+> gets them while the app is connected. The integration therefore reads the
+> **active profile's curve at the current time** whenever the schedule is running,
+> and falls back to the reported values in manual mode. The light entity says
+> which it used, in the attribute `values_from` (`schedule` or `device`).
+
 Every device also gets diagnostics: **last contact**, and **signal strength** where
 the device reports it. Firmware, hardware revision and serial number show up on the
 device page.
@@ -247,7 +255,10 @@ data:
 
 ## Notes
 
-- **Cloud polling**, default interval 60 s.
+- **Cloud polling**, default interval 60 s, adjustable from 30 to 600 s under
+  *Configure* on the integration page. The devices report slowly and the daily
+  curve changes gently — about two percentage points a minute on the steepest
+  ramp — so a longer interval misses nothing and halves the requests.
 - This talks to the manufacturer's own cloud service, the same one the MyJUWEL
   app uses, with your MyJUWEL account. There is no public or documented API for
   it, so if Juwel changes the service, the integration has to be adapted. No

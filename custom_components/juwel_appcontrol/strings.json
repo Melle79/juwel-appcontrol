@@ -176,5 +176,18 @@
         }
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "scan_interval": "Polling interval"
+        },
+        "data_description": {
+          "scan_interval": "How often the cloud is queried. The devices report slowly and the daily curve changes gently, so a longer interval misses nothing and halves the requests."
+        }
+      }
+    }
   }
 }

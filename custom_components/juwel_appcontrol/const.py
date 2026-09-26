@@ -15,6 +15,9 @@ CONF_PASSWORD = "password"
 PREVIEW_TIMEOUT = 3600
 
 DEFAULT_SCAN_INTERVAL = 60  # Sekunden
+CONF_SCAN_INTERVAL = "scan_interval"
+MIN_SCAN_INTERVAL = 30
+MAX_SCAN_INTERVAL = 600
 
 # Produkt-IDs, die diese Integration als Licht behandelt
 LIGHT_PRODUCT_IDS = ("@juwel.lighting.helialux1",)

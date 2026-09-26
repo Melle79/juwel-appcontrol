@@ -62,6 +62,9 @@ class JuwelLight(JuwelEntity, LightEntity):
 
     @property
     def rgbw_color(self) -> tuple[int, int, int, int] | None:
+        if (kurve := self._curve_pct) is not None:
+            return tuple(_pct_to_255(round(kurve.get(c, 0.0)))
+                         for c in ("red", "green", "blue", "white"))
         color = self._state.get("color") or {}
         white = (self._state.get("white") or {}).get("value", 0)
         if not color:
@@ -79,6 +82,9 @@ class JuwelLight(JuwelEntity, LightEntity):
             "mode": self._state.get("mode"),
             "active_preset": self._state.get("active_preset"),
             "preview": self._state.get("preview"),
+            # Sagt ehrlich, woher die Farbe stammt: aus dem Tagesverlauf des
+            # Profils oder aus dem, was das Geraet zuletzt gemeldet hat.
+            "values_from": "schedule" if self._curve_pct is not None else "device",
         }
 
     async def async_turn_on(self, **kwargs: Any) -> None:
